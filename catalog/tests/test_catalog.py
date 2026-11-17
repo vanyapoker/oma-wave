@@ -106,6 +106,13 @@ class CatalogTests(unittest.TestCase):
         self.assertEqual(result['tracks'][0]['videoId'], 'v')
         self.assertEqual(result['albums'][0]['id'], 'MPRE1')
 
+        omv = {'videoId': 'b', 'title': 'Bahaya (Official Music Video)', 'artists': [{'name': 'Arsy Widianto'}], 'videoType': 'MUSIC_VIDEO_TYPE_OMV'}
+        result = catalog.track(omv)
+        self.assertEqual((result['title'], result['artists']), ('Bahaya', ['Arsy Widianto']))
+        omv = dict(omv, title='Rimar - Tubin Tulat (Official Music Video)', artists=[{'name': 'Rimar Official'}])
+        result = catalog.track(omv)
+        self.assertEqual((result['title'], result['artists']), ('Tubin Tulat', ['Rimar']))
+        self.assertEqual(catalog.track(dict(omv, title='Song - Part 2', artists=[{'name': 'A'}]))['title'], 'Song - Part 2')
 
 if __name__ == '__main__':
     unittest.main()

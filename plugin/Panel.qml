@@ -20,6 +20,7 @@ Panel {
   readonly property var track: playerState ? playerState.track : null
   readonly property var queue: playerState && playerState.queue ? playerState.queue : []
   readonly property var lyricData: playerState && playerState.lyrics ? playerState.lyrics : ({state: "missing", lines: []})
+  readonly property var waveState: playerState && playerState.wave ? playerState.wave : null
   readonly property var lines: lyricData.lines || []
   readonly property int currentLyric: lyricData.state === "synced" ? Model.lyricIndex(lines, backend ? backend.positionMs : 0) : -1
 
@@ -51,6 +52,14 @@ Panel {
     close()
   }
   function selectedIndex() { return (playerState ? playerState.queueOffset : 0) + cursor }
+  function toggleLike() {
+    if (backend && backend.connected && track) backend.send("rate", {rating: playerState.rating === "like" ? "none" : "like"})
+  }
+  function dislike() {
+    if (!backend || !backend.connected || !track) return
+    backend.send("rate", {rating: "dislike"})
+    backend.send("next")
+  }
   onQueueChanged: cursor = Math.max(0, Math.min(cursor, queue.length - 1))
 
   Commons.Translations { id: strings; directory: Qt.resolvedUrl("i18n") }
@@ -91,6 +100,9 @@ Panel {
       onTextKey: function(text, modifiers) {
         if (text.toLowerCase() === "y") root.showLyrics = !root.showLyrics
         else if (text.toLowerCase() === "o") root.openApp()
+        else if (text.toLowerCase() === "w") { if (root.backend && root.backend.connected) root.backend.send("wave") }
+        else if (text === "+") root.toggleLike()
+        else if (text === "-") root.dislike()
       }
 
       Column {
@@ -115,7 +127,32 @@ Panel {
           }
         }
         Column {
-          visible: !!root.playerState
+          visible: !!root.playerState && !root.track
+          width: parent.width
+          spacing: Style.space(10)
+          Button {
+            width: parent.width
+            text: strings.t("myWave")
+            foreground: root.bar ? root.bar.foreground : Commons.Color.foreground
+            onClicked: root.backend.send("wave")
+          }
+          Row {
+            anchors.horizontalCenter: parent.horizontalCenter
+            spacing: Style.space(4)
+            Repeater {
+              model: [["any", "moodAny"], ["energetic", "moodEnergetic"], ["happy", "moodHappy"], ["calm", "moodCalm"], ["sad", "moodSad"]]
+              delegate: Button {
+                required property var modelData
+                text: strings.t(modelData[1])
+                selected: !!root.waveState && root.waveState.mood === modelData[0]
+                foreground: root.bar ? root.bar.foreground : Commons.Color.foreground
+                onClicked: root.backend.send("wave", {mood: modelData[0]})
+              }
+            }
+          }
+        }
+        Column {
+          visible: !!root.playerState && !!root.track
           width: parent.width
           spacing: Style.space(10)
           Row {
@@ -162,6 +199,17 @@ Panel {
               }
               Text {
                 width: parent.width
+                visible: !!root.waveState && root.waveState.active
+                textFormat: Text.PlainText
+                text: strings.t("myWave")
+                color: Commons.Color.accent
+                font.family: root.bar ? root.bar.fontFamily : Style.font.family
+                font.pixelSize: Style.font.caption
+                font.bold: true
+              }
+              Text {
+                width: parent.width
+                visible: text !== "" && (!root.track || root.track.album !== root.track.title)
                 textFormat: Text.PlainText
                 text: root.track && root.track.album ? root.track.album : ""
                 color: root.bar ? root.bar.foreground : Commons.Color.foreground
@@ -204,9 +252,11 @@ Panel {
             spacing: Style.space(6)
             LayoutMirroring.enabled: false
             LayoutMirroring.childrenInherit: true
+            Button { iconText: root.playerState && root.playerState.rating === "dislike" ? "󰔑" : "󰔒"; foreground: root.playerState && root.playerState.rating === "dislike" ? Commons.Color.accent : (root.bar ? root.bar.foreground : Commons.Color.foreground); tooltipText: strings.t("dislike"); enabled: !!root.track; opacity: enabled ? 1 : 0.4; onClicked: root.dislike() }
             Button { iconText: "󰒮"; foreground: root.bar ? root.bar.foreground : Commons.Color.foreground; enabled: !!root.playerState && root.playerState.canPrevious; opacity: enabled ? 1 : 0.4; onClicked: root.backend.send("previous") }
             Button { iconText: root.playerState && root.playerState.playing ? "󰏤" : "󰐊"; foreground: root.bar ? root.bar.foreground : Commons.Color.foreground; onClicked: root.backend.send("playPause") }
             Button { iconText: "󰒭"; foreground: root.bar ? root.bar.foreground : Commons.Color.foreground; enabled: !!root.playerState && root.playerState.canNext; opacity: enabled ? 1 : 0.4; onClicked: root.backend.send("next") }
+            Button { iconText: root.playerState && root.playerState.rating === "like" ? "󰔓" : "󰔔"; foreground: root.playerState && root.playerState.rating === "like" ? Commons.Color.accent : (root.bar ? root.bar.foreground : Commons.Color.foreground); tooltipText: strings.t("like"); enabled: !!root.track; opacity: enabled ? 1 : 0.4; onClicked: root.toggleLike() }
           }
           Row {
             anchors.horizontalCenter: parent.horizontalCenter
@@ -224,12 +274,29 @@ Panel {
               clip: true
               model: root.queue
               delegate: Button {
+                id: row
                 required property var modelData
                 required property int index
                 width: queueList.width
                 leftAlign: true
-                text: (modelData.title || "") + (modelData.artist ? " · " + modelData.artist : "")
+                text: ""
+                height: rowLabel.implicitHeight + Style.spacing.controlPaddingY * 2
                 foreground: root.bar ? root.bar.foreground : Commons.Color.foreground
+                Text {
+                  id: rowLabel
+                  anchors.verticalCenter: parent.verticalCenter
+                  anchors.left: parent.left
+                  anchors.right: parent.right
+                  anchors.leftMargin: Style.spacing.controlPaddingX
+                  anchors.rightMargin: Style.spacing.controlPaddingX
+                  textFormat: Text.PlainText
+                  text: (row.modelData.title || "") + (row.modelData.artist ? " · " + row.modelData.artist : "")
+                  color: root.bar ? root.bar.foreground : Commons.Color.foreground
+                  font.family: root.bar ? root.bar.fontFamily : Style.font.family
+                  font.pixelSize: Style.font.body
+                  font.bold: row.selected
+                  elide: Text.ElideRight
+                }
                 selected: root.playerState && root.playerState.queueOffset + index === root.playerState.queueIndex
                 hasCursor: root.cursor === index
                 onHovered: function(hot) { if (hot) root.cursor = index }

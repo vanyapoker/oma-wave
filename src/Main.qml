@@ -12,6 +12,7 @@ ApplicationWindow {
     visible: !startHidden
     title: "omawave"
     color: "#0e0e10"
+    readonly property bool narrow: width < 900
 
     Material.theme: Material.Dark
     Material.accent: theme.accent
@@ -103,7 +104,8 @@ ApplicationWindow {
             Sidebar {
                 id: sidebar
                 Layout.fillHeight: true
-                Layout.preferredWidth: 200
+                compact: win.narrow
+                Layout.preferredWidth: win.narrow ? 64 : 200
                 onGo: function(name) { win.navigate(name) }
                 onSignInRequested: signIn.open()
             }
