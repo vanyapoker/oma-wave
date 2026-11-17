@@ -46,6 +46,7 @@ BarWidget {
   }
   Row {
     id: row
+    z: 1
     anchors.centerIn: parent
     spacing: Style.space(6)
     Visualizer {
@@ -57,7 +58,7 @@ BarWidget {
     }
     Item {
       id: scrollClip
-      width: visible ? Math.min(Math.max(60, Math.min(400, Number(root.setting("maxLabelWidth", 180)) || 180)), label.implicitWidth) : 0
+      width: visible ? Math.min(Math.max(60, Math.min(400, Number(root.setting("maxLabelWidth", 120)) || 120)), label.implicitWidth) : 0
       height: label.implicitHeight
       clip: true
       anchors.verticalCenter: parent.verticalCenter
@@ -79,6 +80,24 @@ BarWidget {
           to: -label.implicitWidth
           easing.type: Easing.Linear
         }
+      }
+    }
+    Row {
+      id: controls
+      anchors.verticalCenter: parent.verticalCenter
+      visible: !root.vertical && backend.connected && !!root.track && !!root.setting("showControls", true)
+      spacing: 0
+      LayoutMirroring.enabled: false
+      LayoutMirroring.childrenInherit: true
+      readonly property color fg: root.bar ? root.bar.barForeground : "white"
+      Button { iconText: root.playing ? "󰏤" : "󰐊"; foreground: controls.fg; tooltipText: strings.t(root.playing ? "pause" : "play"); onClicked: backend.send("playPause") }
+      Button { iconText: "󰒭"; foreground: controls.fg; tooltipText: strings.t("next"); enabled: !!backend.state && backend.state.canNext; opacity: enabled ? 1 : 0.4; onClicked: backend.send("next") }
+      Button {
+        readonly property bool liked: !!backend.state && backend.state.rating === "like"
+        iconText: liked ? "󰔓" : "󰔔"
+        foreground: liked ? Commons.Color.accent : controls.fg
+        tooltipText: strings.t("like")
+        onClicked: backend.send("rate", {rating: liked ? "none" : "like"})
       }
     }
   }

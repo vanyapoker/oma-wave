@@ -14,10 +14,11 @@
     "category": "Media",
     "allowMultiple": false,
     "defaultSection": "centerBegin",
-    "defaults": { "maxLabelWidth": 180, "showTitle": true },
+    "defaults": { "maxLabelWidth": 120, "showTitle": true, "showControls": true },
     "schema": [
-      { "key": "maxLabelWidth", "type": "integer", "label": "Title width", "min": 60, "max": 400, "step": 10, "defaultValue": 180 },
-      { "key": "showTitle", "type": "boolean", "label": "Show title", "defaultValue": true }
+      { "key": "maxLabelWidth", "type": "integer", "label": "Title width", "min": 60, "max": 400, "step": 10, "defaultValue": 120 },
+      { "key": "showTitle", "type": "boolean", "label": "Show title", "defaultValue": true },
+      { "key": "showControls", "type": "boolean", "label": "Show playback buttons", "defaultValue": true }
     ]
   }
 }

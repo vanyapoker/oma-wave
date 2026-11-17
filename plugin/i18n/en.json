@@ -13,5 +13,8 @@
   "moodCalm": "Calm",
   "moodSad": "Sad",
   "like": "Like",
-  "dislike": "Dislike"
+  "dislike": "Dislike",
+  "play": "Play",
+  "pause": "Pause",
+  "next": "Next"
 }
