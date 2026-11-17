@@ -11,6 +11,7 @@
 #include <QQmlContext>
 #include <QQuickStyle>
 #include <QQuickWindow>
+#include <QSGRendererInterface>
 #include <QTextStream>
 #include <QSocketNotifier>
 #include <QUrl>
@@ -93,6 +94,8 @@ int main(int argc, char *argv[]) {
     // Commands never show a window, so they run without a display.
     if (!command.isEmpty())
         qputenv("QT_QPA_PLATFORM", "offscreen");
+
+    QQuickWindow::setGraphicsApi(QSGRendererInterface::Software);
 
     QGuiApplication app(argc, argv);
     app.setApplicationName("omawave");

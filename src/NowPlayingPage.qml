@@ -1,7 +1,6 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
-import QtQuick.Effects
 import QtQuick.Layouts
 
 // Full-window view of the current track: large art and lyrics.
@@ -14,21 +13,13 @@ Page {
     Image {
         id: backdrop
         anchors.fill: parent
-        visible: false
+        opacity: 0.15
         source: root.track.thumb || ""
         asynchronous: true
         fillMode: Image.PreserveAspectCrop
-        sourceSize.width: 256
-        sourceSize.height: 256
-    }
-    MultiEffect {
-        anchors.fill: parent
-        source: backdrop
-        visible: backdrop.status === Image.Ready
-        blurEnabled: true
-        blur: 1.0
-        blurMax: 64
-        opacity: 0.25
+        sourceSize.width: 24
+        sourceSize.height: 24
+        smooth: true
     }
 
     IconButton {
