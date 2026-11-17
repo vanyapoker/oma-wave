@@ -50,6 +50,7 @@ BarWidget {
     anchors.centerIn: parent
     spacing: Style.space(6)
     Visualizer {
+      visible: !!root.setting("showVisualizer", true)
       anchors.verticalCenter: parent.verticalCenter
       bar: root.bar
       levels: backend.levels

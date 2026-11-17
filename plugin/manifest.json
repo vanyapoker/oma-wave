@@ -18,6 +18,7 @@
     "schema": [
       { "key": "maxLabelWidth", "type": "integer", "label": "Title width", "min": 60, "max": 400, "step": 10, "defaultValue": 120 },
       { "key": "showTitle", "type": "boolean", "label": "Show title", "defaultValue": true },
+      { "key": "showVisualizer", "type": "boolean", "label": "Show visualizer", "defaultValue": true },
       { "key": "showControls", "type": "boolean", "label": "Show playback buttons", "defaultValue": true }
     ]
   }

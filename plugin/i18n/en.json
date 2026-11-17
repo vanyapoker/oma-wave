@@ -16,5 +16,11 @@
   "dislike": "Dislike",
   "play": "Play",
   "pause": "Pause",
-  "next": "Next"
+  "next": "Next",
+  "settings": "Settings",
+  "settingsHint": "Changes show in the bar right away.",
+  "showVisualizer": "Show visualizer",
+  "showTitle": "Show title",
+  "showControls": "Show playback buttons",
+  "titleWidth": "Title width"
 }

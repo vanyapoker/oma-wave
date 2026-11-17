@@ -15,6 +15,15 @@ Panel {
   readonly property var barIdentity: hostWidget || root
   property bool openedFromHotkey: false
   property bool showLyrics: false
+  property bool showSettings: false
+  readonly property bool queueTab: !showLyrics && !showSettings
+  readonly property bool lyricsTab: showLyrics && !showSettings
+  property int pendingWidth: 120
+
+  function opt(key, fallback) { return hostWidget ? hostWidget.setting(key, fallback) : fallback }
+  // omarchy writes shell.json; the bar widget re-reads its settings, so the bar is the live preview.
+  function applyOpt(key, value) { if (bar) bar.run("omarchy bar set vp.omawave " + key + " " + value + " --json") }
+  Timer { id: widthTimer; interval: 120; onTriggered: root.applyOpt("maxLabelWidth", root.pendingWidth) }
   property int cursor: 0
   readonly property var playerState: backend && backend.connected ? backend.state : null
   readonly property var track: playerState ? playerState.track : null
@@ -85,20 +94,20 @@ Panel {
         var enter = returnHandled
         returnHandled = false
         if (!root.backend || !root.backend.connected) return
-        if (enter) { if (!root.showLyrics && root.queue.length) root.backend.send("jump", {index: root.selectedIndex()}) }
+        if (enter) { if (root.queueTab && root.queue.length) root.backend.send("jump", {index: root.selectedIndex()}) }
         else root.backend.send("playPause")
       }
-      onDeleteRequested: if (root.backend && root.backend.connected && !root.showLyrics && root.queue.length) root.backend.send("remove", {index: root.selectedIndex()})
+      onDeleteRequested: if (root.backend && root.backend.connected && root.queueTab && root.queue.length) root.backend.send("remove", {index: root.selectedIndex()})
       onMoveRequested: function(dx, dy) {
         if (!root.backend || !root.backend.connected) return
         if (dx) root.backend.send(dx < 0 ? "previous" : "next")
-        else if (!root.showLyrics && root.queue.length) {
+        else if (root.queueTab && root.queue.length) {
           root.cursor = Math.max(0, Math.min(root.queue.length - 1, root.cursor + dy))
           queueList.positionViewAtIndex(root.cursor, ListView.Contain)
         }
       }
       onTextKey: function(text, modifiers) {
-        if (text.toLowerCase() === "y") root.showLyrics = !root.showLyrics
+        if (text.toLowerCase() === "y") { root.showSettings = false; root.showLyrics = !root.showLyrics }
         else if (text.toLowerCase() === "o") root.openApp()
         else if (text.toLowerCase() === "w") { if (root.backend && root.backend.connected) root.backend.send("wave") }
         else if (text === "+") root.toggleLike()
@@ -261,16 +270,17 @@ Panel {
           Row {
             anchors.horizontalCenter: parent.horizontalCenter
             spacing: Style.space(4)
-            Button { text: strings.t("queue"); selected: !root.showLyrics; foreground: root.bar ? root.bar.foreground : Commons.Color.foreground; onClicked: root.showLyrics = false }
-            Button { text: strings.t("lyrics"); selected: root.showLyrics; foreground: root.bar ? root.bar.foreground : Commons.Color.foreground; onClicked: root.showLyrics = true }
+            Button { text: strings.t("queue"); selected: root.queueTab; foreground: root.bar ? root.bar.foreground : Commons.Color.foreground; onClicked: { root.showSettings = false; root.showLyrics = false } }
+            Button { text: strings.t("lyrics"); selected: root.lyricsTab; foreground: root.bar ? root.bar.foreground : Commons.Color.foreground; onClicked: { root.showSettings = false; root.showLyrics = true } }
+            Button { text: strings.t("settings"); selected: root.showSettings; foreground: root.bar ? root.bar.foreground : Commons.Color.foreground; onClicked: root.showSettings = true }
           }
           Item {
             width: parent.width
-            height: Style.space(240)
+            height: Style.space(root.showSettings ? 300 : 240)
             ListView {
               id: queueList
               anchors.fill: parent
-              visible: !root.showLyrics
+              visible: root.queueTab
               clip: true
               model: root.queue
               delegate: Button {
@@ -306,7 +316,7 @@ Panel {
             ListView {
               id: lyricList
               anchors.fill: parent
-              visible: root.showLyrics && (root.lyricData.state === "synced" || root.lyricData.state === "plain")
+              visible: root.lyricsTab && (root.lyricData.state === "synced" || root.lyricData.state === "plain")
               clip: true
               model: root.lines
               delegate: Text {
@@ -330,12 +340,69 @@ Panel {
             }
             Text {
               anchors.centerIn: parent
-              visible: root.showLyrics && root.lyricData.state === "missing"
+              visible: root.lyricsTab && root.lyricData.state === "missing"
               textFormat: Text.PlainText
               text: strings.t("noLyrics")
               color: root.bar ? root.bar.foreground : Commons.Color.foreground
               font.family: root.bar ? root.bar.fontFamily : Style.font.family
               font.pixelSize: Style.font.body
+            }
+            Column {
+              anchors.fill: parent
+              visible: root.showSettings
+              spacing: Style.space(6)
+              Text {
+                width: parent.width
+                textFormat: Text.PlainText
+                text: strings.t("settingsHint")
+                wrapMode: Text.Wrap
+                color: root.bar ? root.bar.foreground : Commons.Color.foreground
+                opacity: 0.7
+                font.family: root.bar ? root.bar.fontFamily : Style.font.family
+                font.pixelSize: Style.font.caption
+              }
+              Toggle {
+                width: parent.width
+                label: strings.t("showVisualizer")
+                checked: !!root.opt("showVisualizer", true)
+                foreground: root.bar ? root.bar.foreground : Commons.Color.foreground
+                onClicked: root.applyOpt("showVisualizer", !checked)
+              }
+              Toggle {
+                width: parent.width
+                label: strings.t("showTitle")
+                checked: !!root.opt("showTitle", true)
+                foreground: root.bar ? root.bar.foreground : Commons.Color.foreground
+                onClicked: root.applyOpt("showTitle", !checked)
+              }
+              Toggle {
+                width: parent.width
+                label: strings.t("showControls")
+                checked: !!root.opt("showControls", true)
+                foreground: root.bar ? root.bar.foreground : Commons.Color.foreground
+                onClicked: root.applyOpt("showControls", !checked)
+              }
+              Text {
+                textFormat: Text.PlainText
+                text: strings.t("titleWidth") + ": " + Math.round(widthSlider.liveValue)
+                color: root.bar ? root.bar.foreground : Commons.Color.foreground
+                opacity: widthSlider.enabled ? 1 : 0.4
+                font.family: root.bar ? root.bar.fontFamily : Style.font.family
+                font.pixelSize: Style.font.body
+              }
+              PanelSlider {
+                id: widthSlider
+                width: parent.width
+                bar: root.bar
+                minimum: 60
+                maximum: 400
+                step: 10
+                integer: true
+                enabled: !!root.opt("showTitle", true)
+                value: Number(root.opt("maxLabelWidth", 120)) || 120
+                onMoved: function(value) { root.pendingWidth = Math.round(value); widthTimer.restart() }
+                onReleased: function(value) { widthTimer.stop(); root.applyOpt("maxLabelWidth", Math.round(value)) }
+              }
             }
           }
         }
