@@ -2,12 +2,14 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Layouts
+import "Format.js" as Format
 
 Rectangle {
     id: root
     color: "#141416"
     property string pane: ""
     signal togglePane(string name)
+    signal nowPlayingRequested()
     readonly property var track: player.track
     readonly property bool hasTrack: player.queueIndex >= 0
     readonly property bool compact: root.width < 860
@@ -58,7 +60,7 @@ Rectangle {
                 ToolTip.visible: artHover.hovered && !visualizer.available && !root.track.thumb
                 ToolTip.text: qsTr("Visualizer off: cava is not installed")
                 HoverHandler { id: artHover; cursorShape: Qt.PointingHandCursor }
-                TapHandler { onTapped: ApplicationWindow.window.openNowPlaying() }
+                TapHandler { onTapped: root.nowPlayingRequested() }
                 RoundedImage {
                     anchors.fill: parent
                     source: root.track.thumb || ""
@@ -163,7 +165,7 @@ Rectangle {
             RowLayout {
                 Layout.fillWidth: true
                 spacing: 8
-                Text { text: ApplicationWindow.window.fmt(player.positionMs); color: "#a0a0a8"; font.pixelSize: 11; textFormat: Text.PlainText }
+                Text { text: Format.time(player.positionMs); color: "#a0a0a8"; font.pixelSize: 11; textFormat: Text.PlainText }
                 ThinSlider {
                     id: seek
                     Layout.fillWidth: true
@@ -172,7 +174,7 @@ Rectangle {
                     onPressedChanged: if (!pressed) player.seek(value)
                     Binding { target: seek; property: "value"; value: player.positionMs; when: !seek.pressed; restoreMode: Binding.RestoreNone }
                 }
-                Text { text: ApplicationWindow.window.fmt(player.durationMs); color: "#a0a0a8"; font.pixelSize: 11; textFormat: Text.PlainText }
+                Text { text: Format.time(player.durationMs); color: "#a0a0a8"; font.pixelSize: 11; textFormat: Text.PlainText }
             }
         }
 

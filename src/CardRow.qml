@@ -7,8 +7,9 @@ Column {
     id: root
     property string title
     property var items: []
+    readonly property int tileSize: Math.max(140, Math.min(200, Math.floor((width - 12 * 5) / 6)))
     spacing: 8
-    visible: items && items.length > 0
+    visible: !!root.items && root.items.length > 0
 
     Text {
         text: root.title
@@ -19,11 +20,11 @@ Column {
     }
     ListView {
         width: root.width
-        height: 214
+        height: root.tileSize + 54
         orientation: ListView.Horizontal
         spacing: 12
         clip: true
-        model: root.items
-        delegate: CardTile { item: modelData }
+        model: root.items || []
+        delegate: CardTile { item: modelData; size: root.tileSize }
     }
 }

@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
-import QtQuick.Effects
+import QtQuick.Controls.impl
 import QtQuick.Layouts
 
 Rectangle {
@@ -63,25 +63,13 @@ Rectangle {
                 contentItem: Row {
                     spacing: 12
                     leftPadding: root.compact ? 0 : 4
-                    Item {
+                    IconImage {
                         width: 22
                         height: 22
                         anchors.verticalCenter: parent.verticalCenter
-                        Image {
-                            id: glyph
-                            anchors.fill: parent
-                            visible: false
-                            layer.enabled: true
-                            source: "qrc:/icons/" + modelData.icon + ".svg"
-                            sourceSize.width: 44
-                            sourceSize.height: 44
-                        }
-                        MultiEffect {
-                            anchors.fill: parent
-                            source: glyph
-                            colorization: 1.0
-                            colorizationColor: nav.tint
-                        }
+                        source: "qrc:/icons/" + modelData.icon + ".svg"
+                        sourceSize: Qt.size(44, 44)
+                        color: nav.tint
                     }
                     Text {
                         visible: !root.compact

@@ -7,6 +7,8 @@ Page {
     id: root
     background: null
     readonly property var results: catalog.searchResults
+    readonly property bool searched: root.results.songs !== undefined
+    readonly property bool empty: !root.results.top && ["songs", "albums", "artists", "playlists"].every(k => (root.results[k] || []).length === 0)
 
     function focusSearch() { field.forceActiveFocus(); field.selectAll() }
     StackView.onActivated: focusSearch()
@@ -22,7 +24,10 @@ Page {
         TextField {
             id: field
             anchors.fill: parent
-            anchors.margins: 12
+            anchors.leftMargin: 20
+            anchors.rightMargin: 20
+            anchors.topMargin: 12
+            anchors.bottomMargin: 12
             placeholderText: qsTr("Search songs, albums, artists")
             onTextChanged: debounce.restart()
             onAccepted: { debounce.stop(); catalog.search(text) }
@@ -68,6 +73,19 @@ Page {
             CardRow { width: column.width; title: qsTr("Artists"); items: root.results.artists }
             CardRow { width: column.width; title: qsTr("Playlists"); items: root.results.playlists }
         }
+    }
+
+    Text {
+        anchors.centerIn: parent
+        width: parent.width - 80
+        horizontalAlignment: Text.AlignHCenter
+        wrapMode: Text.Wrap
+        visible: !catalog.busy && (field.text.trim() === "" || (root.searched && root.empty))
+        text: field.text.trim() === "" ? qsTr("Find songs, albums, artists and playlists")
+            : qsTr("No results for “%1”").arg(field.text.trim())
+        color: "#a0a0a8"
+        font.pixelSize: 15
+        textFormat: Text.PlainText
     }
 
     BusyIndicator {

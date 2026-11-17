@@ -5,5 +5,13 @@
   "queue": "Queue",
   "lyrics": "Lyrics",
   "noLyrics": "No lyrics found",
-  "nothingPlaying": "Nothing playing"
+  "nothingPlaying": "Nothing playing",
+  "myWave": "My Wave",
+  "moodAny": "Any",
+  "moodEnergetic": "Energetic",
+  "moodHappy": "Happy",
+  "moodCalm": "Calm",
+  "moodSad": "Sad",
+  "like": "Like",
+  "dislike": "Dislike"
 }

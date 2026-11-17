@@ -4,6 +4,7 @@
 #include "paths.h"
 #include "player.h"
 #include "visualizer.h"
+#include "wave.h"
 
 #include <QJsonArray>
 #include <QCoreApplication>
@@ -23,9 +24,9 @@ QJsonObject trackJson(const QVariantMap &t) {
 }
 }
 
-ControlServer::ControlServer(Player *player, Lyrics *lyrics, Visualizer *visualizer, const QString &socketPath,
-                             QObject *parent)
-    : QObject(parent), m_player(player), m_lyrics(lyrics), m_visualizer(visualizer),
+ControlServer::ControlServer(Player *player, Lyrics *lyrics, Visualizer *visualizer, Wave *wave,
+                             const QString &socketPath, QObject *parent)
+    : QObject(parent), m_player(player), m_lyrics(lyrics), m_visualizer(visualizer), m_wave(wave),
       m_path(socketPath.isEmpty() ? Paths::controlSocket() : socketPath) {
     m_server.setSocketOptions(QLocalServer::UserAccessOption);
     connect(&m_server, &QLocalServer::newConnection, this, &ControlServer::onNewConnection);
@@ -37,6 +38,10 @@ ControlServer::ControlServer(Player *player, Lyrics *lyrics, Visualizer *visuali
     connect(player, &Player::stateChanged, this, schedule);
     connect(lyrics, &Lyrics::stateChanged, this, schedule);
     connect(lyrics, &Lyrics::linesChanged, this, schedule);
+    connect(wave, &Wave::activeChanged, this, schedule);
+    connect(wave, &Wave::loadingChanged, this, schedule);
+    connect(wave, &Wave::settingsChanged, this, schedule);
+    connect(wave, &Wave::ratingChanged, this, schedule);
 
     m_positionTimer.setInterval(1000);
     connect(&m_positionTimer, &QTimer::timeout, this, [this] {
@@ -98,6 +103,9 @@ QJsonObject ControlServer::stateJson() const {
     m["lyrics"] = QJsonObject{{"state", m_lyrics->state()},
                               {"lines", QJsonArray::fromVariantList(m_lyrics->lines())}};
     m["error"] = m_player->error();
+    m["wave"] = QJsonObject{{"active", m_wave->active()}, {"loading", m_wave->loading()}, {"mood", m_wave->mood()},
+                            {"activity", m_wave->activity()}, {"character", m_wave->character()}};
+    m["rating"] = m_wave->rating();
     return m;
 }
 
@@ -166,6 +174,22 @@ void ControlServer::handle(Client *client, const QJsonObject &m) {
     else if (cmd == "jump") m_player->jump(m.value("index").toInt());
     else if (cmd == "remove") m_player->removeAt(m.value("index").toInt());
     else if (cmd == "setVolume") m_player->setVolume(m.value("volume").toInt());
+    else if (cmd == "wave") {
+        if (m.contains("mood")) m_wave->setMood(m.value("mood").toString());
+        if (m.contains("activity")) m_wave->setActivity(m.value("activity").toString());
+        if (m.contains("character")) m_wave->setCharacter(m.value("character").toString());
+        m_wave->start();
+    } else if (cmd == "waveStop") m_wave->stop();
+    else if (cmd == "rate") {
+        const QString rating = m.value("rating").toString();
+        if (rating == "like" || rating == "dislike" || rating == "none") {
+            m_wave->rate(rating);
+        } else {
+            auto e = message("error");
+            e["message"] = "bad rating";
+            sendTo(client->socket, e);
+        }
+    }
     else if (cmd == "subscribeLevels") {
         const bool on = m.value("on").toBool();
         if (on != client->levels) {

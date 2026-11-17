@@ -16,6 +16,7 @@
 #include "theme.h"
 #include "translator.h"
 #include "visualizer.h"
+#include "wave.h"
 
 class OmawaveTests : public QObject {
     Q_OBJECT
@@ -129,6 +130,11 @@ private slots:
         Settings again(dir.path());
         QCOMPARE(again.volume(), 33);
         QCOMPARE(again.browser(), QString("firefox"));
+        QCOMPARE(again.waveMood(), QString("any"));
+        again.setWaveMood("calm");
+        again.setWaveMood("bogus");
+        QCOMPARE(again.waveMood(), QString("calm"));
+        QCOMPARE(Settings(dir.path()).waveMood(), QString("calm"));
         write(dir.path() + "/settings.json", "{not json");
         QTest::ignoreMessage(QtWarningMsg, QRegularExpression("corrupt settings"));
         Settings corrupt(dir.path());
@@ -162,7 +168,8 @@ private slots:
         Lyrics lyrics(nullptr, &player);
         Visualizer visualizer("/nonexistent/cava");
         const QString path = m_runtime.filePath("test-control.sock");
-        ControlServer server(&player, &lyrics, &visualizer, path);
+        Wave wave(nullptr, &player, &settings);
+        ControlServer server(&player, &lyrics, &visualizer, &wave, path);
         QVERIFY(server.listen());
 
         player.playTracks(m_tracks, 0, false);
@@ -182,6 +189,13 @@ private slots:
         QCOMPARE(received[1].value("type").toString(), QString("state"));
         QCOMPARE(received[1].value("v").toInt(), 1);
         QCOMPARE(received[1].value("queueCount").toInt(), 3);
+        QCOMPARE(received[1].value("wave").toObject().value("active").toBool(), false);
+        QCOMPARE(received[1].value("rating").toString(), QString("none"));
+
+        received.clear();
+        client.write("{\"v\":1,\"cmd\":\"rate\",\"rating\":\"bogus\"}\n");
+        QTRY_VERIFY(!received.isEmpty());
+        QCOMPARE(received.last().value("type").toString(), QString("error"));
 
         received.clear();
         client.write("{\"v\":1,\"cmd\":\"bogus\"}\n");
@@ -218,6 +232,45 @@ private slots:
         QString code;
         catalog.request("ping", {}, [&](const QVariant &, const QString &c, const QString &) { code = c; });
         QTRY_COMPARE(code, QString("worker_stopped"));
+    }
+
+    void waveStartsAndTopsUp() {
+        QTemporaryDir dir;
+        QStringList media;
+        for (int i = 0; i < 9; ++i) {
+            media << dir.filePath(QString("w%1.ogg").arg(i));
+            QVERIFY(QFile::copy(m_media.filePath("a.ogg"), media.last()));
+        }
+        qputenv("OMAWAVE_TEST_MEDIA", media.join(':').toUtf8());
+        const QString script = dir.filePath("worker.py");
+        write(script,
+              "import sys, json, os\n"
+              "media = os.environ['OMAWAVE_TEST_MEDIA'].split(':')\n"
+              "n = 0\n"
+              "print(json.dumps({'id': 0, 'result': {'ready': True, 'signedIn': False}}), flush=True)\n"
+              "for line in sys.stdin:\n"
+              "    req = json.loads(line)\n"
+              "    result = {}\n"
+              "    if req['method'] == 'waveNext':\n"
+              "        tracks = []\n"
+              "        for _ in range(3):\n"
+              "            tracks.append({'videoId': 'w%d' % n, 'title': 'w%d' % n, 'url': media[n % len(media)]})\n"
+              "            n += 1\n"
+              "        result = {'tracks': tracks}\n"
+              "    print(json.dumps({'id': req['id'], 'result': result}), flush=True)\n");
+        Catalog catalog(script, dir.path());
+        Settings settings(dir.path());
+        Player player(&catalog, &settings, {}, {"--ao=null"});
+        Wave wave(&catalog, &player, &settings);
+
+        wave.start();
+        QTRY_VERIFY(wave.active());
+        // Three tracks leave only two upcoming, so the wave fetches another batch at once.
+        QTRY_COMPARE(player.queueCount(), 6);
+        player.jump(4);
+        QTRY_COMPARE(player.queueCount(), 9);
+        player.playTracks(m_tracks, 0, false);
+        QTRY_VERIFY(!wave.active());
     }
 };
 

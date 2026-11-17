@@ -29,34 +29,10 @@ Rectangle {
                 : lyrics.state === "error" ? qsTr("Could not load lyrics")
                 : qsTr("Nothing playing")
         }
-        ListView {
-            id: view
+        LyricsView {
             Layout.fillWidth: true
             Layout.fillHeight: true
             visible: lyrics.state === "synced" || lyrics.state === "plain"
-            clip: true
-            model: lyrics.lines
-            delegate: Text {
-                readonly property bool active: lyrics.state === "synced" && index === lyrics.currentIndex
-                width: view.width - 32
-                x: 16
-                topPadding: 6
-                bottomPadding: 6
-                wrapMode: Text.Wrap
-                horizontalAlignment: lyrics.state === "synced" ? Text.AlignHCenter : Text.AlignLeft
-                text: modelData.text
-                color: active ? theme.accent : lyrics.state === "synced" ? "#8a8a92" : "white"
-                font.pixelSize: active ? 18 : 15
-                font.bold: active
-                textFormat: Text.PlainText
-            }
-            Connections {
-                target: lyrics
-                function onCurrentIndexChanged() {
-                    if (lyrics.currentIndex >= 0)
-                        view.positionViewAtIndex(lyrics.currentIndex, ListView.Center)
-                }
-            }
         }
     }
 }

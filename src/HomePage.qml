@@ -5,25 +5,30 @@ import QtQuick.Controls.Material
 Page {
     id: root
     background: null
-    Component.onCompleted: if (catalog.home.length === 0) catalog.loadHome()
+    property int hour: new Date().getHours()
+    Component.onCompleted: {
+        hour = new Date().getHours()
+        if (catalog.home.length === 0) catalog.loadHome()
+    }
 
     header: Item {
         height: 52
         Text {
             x: 20
             anchors.verticalCenter: parent.verticalCenter
-            text: qsTr("Home")
+            text: root.hour >= 5 && root.hour < 12 ? qsTr("Good morning")
+                : root.hour >= 12 && root.hour < 18 ? qsTr("Good afternoon") : qsTr("Good evening")
             color: "white"
             font.pixelSize: 24
             font.bold: true
             textFormat: Text.PlainText
         }
-        Button {
+        IconButton {
             anchors.right: parent.right
             anchors.rightMargin: 16
             anchors.verticalCenter: parent.verticalCenter
-            flat: true
-            text: qsTr("Refresh")
+            name: "refresh"
+            tip: qsTr("Refresh")
             enabled: !catalog.busy
             onClicked: catalog.loadHome()
         }
@@ -36,6 +41,15 @@ Page {
         spacing: 20
         clip: true
         model: catalog.home
+        header: Item {
+            width: ListView.view.width
+            height: hero.height + 16
+            WaveHero {
+                id: hero
+                width: parent.width
+                height: implicitHeight
+            }
+        }
         delegate: CardRow {
             width: ListView.view.width
             title: modelData.title

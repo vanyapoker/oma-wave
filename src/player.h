@@ -81,6 +81,9 @@ public:
     Q_INVOKABLE void clearError();
 
     void shutdown();
+    void setAutoplay(bool on) { m_autoplay = on; }
+    Q_INVOKABLE void appendTracks(const QVariantList &tracks);
+    Q_INVOKABLE void playCollection(const QString &kind, const QString &id);
 
 signals:
     void playingChanged();
@@ -94,6 +97,8 @@ signals:
     // Anything except the position changed; drives the control socket's state message.
     void stateChanged();
     void seeked(qint64 ms);
+    // Emitted when playTracks replaces the whole queue.
+    void queueReplaced();
 
 private:
     void startMpv();
@@ -135,4 +140,5 @@ private:
     QString m_error;
     QString m_autoplayFor;
     int m_playSerial = 0;
+    bool m_autoplay = true;
 };

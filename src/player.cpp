@@ -127,7 +127,7 @@ void Player::startMpv() {
     QFile::remove(Paths::mpvSocket());
     QStringList args = {"--idle=yes", "--no-video", "--no-config", "--no-terminal",
                         "--input-ipc-server=" + Paths::mpvSocket(), "--audio-client-name=omawave",
-                        "--prefetch-playlist=yes", "--ytdl-format=bestaudio/best",
+                        "--prefetch-playlist=yes", "--demuxer-max-bytes=16MiB", "--demuxer-max-back-bytes=4MiB", "--ytdl-format=bestaudio/best",
                         "--script-opts=ytdl_hook-ytdl_path=/usr/bin/yt-dlp",
                         "--volume=" + QString::number(m_settings->volume())};
     args += m_extraArgs;
@@ -301,6 +301,7 @@ void Player::appendUnique(const QVariantList &tracks) {
 void Player::playTracks(const QVariantList &tracks, int start, bool radio) {
     if (tracks.isEmpty())
         return;
+    emit queueReplaced();
     start = qBound(0, start, int(tracks.size()) - 1);
     const int serial = ++m_playSerial;
     m_meta.clear();
@@ -321,6 +322,22 @@ void Player::playTracks(const QVariantList &tracks, int start, bool radio) {
 }
 
 void Player::enqueue(const QVariantMap &track) { append(track); }
+
+void Player::appendTracks(const QVariantList &tracks) { appendUnique(tracks); }
+
+void Player::playCollection(const QString &kind, const QString &id) {
+    if (!m_catalog)
+        return;
+    m_catalog->request(kind, {{"id", id}}, [this](const QVariant &result, const QString &code, const QString &message) {
+        if (!code.isEmpty()) {
+            m_catalog->reportError(message);
+            return;
+        }
+        const QVariantList tracks = result.toMap().value("tracks").toList();
+        if (!tracks.isEmpty())
+            playTracks(tracks, 0, false);
+    });
+}
 
 void Player::playNext(const QVariantMap &track) {
     remember(track);
@@ -359,7 +376,7 @@ void Player::setVolume(int volume) {
 
 // When the last queue entry plays, ask YouTube Music for what comes next, once per video.
 void Player::maybeAutoplay() {
-    if (!m_catalog || queueCount() == 0 || queueIndex() != queueCount() - 1 || !playing())
+    if (!m_autoplay || !m_catalog || queueCount() == 0 || queueIndex() != queueCount() - 1 || !playing())
         return;
     const QString id = track().value("videoId").toString();
     if (id.isEmpty() || id == m_autoplayFor)

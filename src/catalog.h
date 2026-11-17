@@ -42,6 +42,7 @@ public:
     Q_INVOKABLE void signIn(const QString &browser);
     Q_INVOKABLE void signOut();
     Q_INVOKABLE void clearError();
+    void reportError(const QString &message) { setError(message); }
 
     void upNext(const QString &videoId, Done done);
     void lyrics(const QString &title, const QString &artist, const QString &album, int durationSec, Done done);

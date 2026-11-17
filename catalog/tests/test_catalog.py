@@ -71,7 +71,7 @@ class CatalogTests(unittest.TestCase):
         with self.assertRaises(catalog.WorkerError) as exc:
             self.worker.sign_in('chromium')
         self.assertEqual(exc.exception.code, 'no_session')
-        self.assertEqual(list(Path(self.temp.name).iterdir()), [])
+        self.assertEqual([p.name for p in Path(self.temp.name).iterdir() if p.name != 'taste.sqlite3'], [])
 
     def test_sign_in_writes_private_files(self):
         cookie = types.SimpleNamespace(domain='.youtube.com', name='__Secure-3PAPISID', value='secret')
@@ -106,6 +106,15 @@ class CatalogTests(unittest.TestCase):
         self.assertEqual(result['tracks'][0]['videoId'], 'v')
         self.assertEqual(result['albums'][0]['id'], 'MPRE1')
 
+    def test_video_titles_cleaned(self):
+        ugc = {'videoId': 'x', 'title': 'КИНО | Пачка сигарет (Official Video)', 'artists': [{'name': 'mrPhakel'}], 'videoType': 'MUSIC_VIDEO_TYPE_UGC'}
+        result = catalog.track(ugc)
+        self.assertEqual((result['title'], result['artists']), ('Пачка сигарет', ['КИНО']))
+        atv = {'videoId': 'y', 'title': 'Song - Part 2', 'artists': [{'name': 'A'}], 'videoType': 'MUSIC_VIDEO_TYPE_ATV'}
+        self.assertEqual(catalog.track(atv)['title'], 'Song - Part 2')
+        plain = dict(ugc, title='Around the World')
+        self.assertEqual(catalog.track(plain)['artists'], ['mrPhakel'])
+        self.assertEqual(catalog.track({'videoId': 'z', 'title': 't', 'length': '7:10'})['durationMs'], 430000)
         omv = {'videoId': 'b', 'title': 'Bahaya (Official Music Video)', 'artists': [{'name': 'Arsy Widianto'}], 'videoType': 'MUSIC_VIDEO_TYPE_OMV'}
         result = catalog.track(omv)
         self.assertEqual((result['title'], result['artists']), ('Bahaya', ['Arsy Widianto']))
@@ -113,6 +122,71 @@ class CatalogTests(unittest.TestCase):
         result = catalog.track(omv)
         self.assertEqual((result['title'], result['artists']), ('Tubin Tulat', ['Rimar']))
         self.assertEqual(catalog.track(dict(omv, title='Song - Part 2', artists=[{'name': 'A'}]))['title'], 'Song - Part 2')
+
+    def test_classify_and_rate(self):
+        self.assertEqual(catalog.classify(25000, 200000, False), 'skip')
+        self.assertEqual(catalog.classify(150000, 200000, False), 'complete')
+        self.assertEqual(catalog.classify(25000, 200000, True), 'partial')
+        trk = {'videoId': 'a', 'title': 'T', 'artists': ['X']}
+        self.assertEqual(self.worker.call('rate', {'track': trk, 'rating': 'like'}), {'rating': 'like', 'synced': False})
+        self.assertEqual(self.worker.call('rating', {'videoId': 'a'}), {'rating': 'like'})
+        self.worker.call('rate', {'track': trk, 'rating': 'none'})
+        self.assertEqual(self.worker.call('rating', {'videoId': 'a'}), {'rating': 'none'})
+        with self.assertRaises(catalog.WorkerError):
+            self.worker.call('rate', {'track': trk, 'rating': 'bogus'})
+        self.assertEqual(self.worker.call('logPlay', {'track': trk, 'listenedMs': 500, 'interrupted': True})['outcome'], 'ignored')
+
+    def test_rate_syncs_only_when_signed_in(self):
+        calls = []
+        self.worker.client.rate_song = lambda video_id, status: calls.append((video_id, status.name))
+        trk = {'videoId': 'a', 'title': 'T', 'artists': []}
+        self.worker.call('rate', {'track': trk, 'rating': 'like'})
+        self.assertEqual(calls, [])
+        self.worker.signed_in = True
+        self.assertTrue(self.worker.call('rate', {'track': trk, 'rating': 'dislike'})['synced'])
+        self.assertEqual(calls, [('a', 'DISLIKE')])
+
+    def wave_worker(self, tracks_by_call=None):
+        def watch(videoId=None, playlistId=None, radio=False, limit=25):
+            return {'tracks': [{'videoId': 'm%d' % i, 'title': 'M%d' % i, 'artists': [{'name': 'Art%d' % (i // 2)}], 'length': '3:00'} for i in range(8)]}
+        client = types.SimpleNamespace(
+            get_mood_categories=lambda: {'Moods & moments': [{'title': 'Chill', 'params': 'CHILLP'}, {'title': 'Sad', 'params': 'SADP'}]},
+            get_mood_playlists=lambda params: self.mood_calls.append(params) or [{'title': 'p', 'playlistId': 'PL1'}],
+            get_watch_playlist=watch, get_history=lambda: [], get_liked_songs=lambda limit: {'tracks': []})
+        self.mood_calls = []
+        self.worker.client = client
+        self.worker.random = __import__('random').Random(1)
+        return self.worker
+
+    def test_wave_cold_start_and_filters(self):
+        worker = self.wave_worker()
+        worker.call('rate', {'track': {'videoId': 'm0', 'title': 'M0', 'artists': ['Art0']}, 'rating': 'dislike'})
+        result = worker.call('waveNext', {'mood': 'calm', 'exclude': ['m5'], 'count': 10})['tracks']
+        self.assertEqual(self.mood_calls, ['CHILLP'])
+        ids = [t['videoId'] for t in result]
+        self.assertTrue(0 < len(ids) <= 10)
+        self.assertNotIn('m0', ids)
+        self.assertNotIn('m5', ids)
+        # Only 2 per artist: 8 tracks over 4 artists, one artist's tracks partly dropped.
+        artists = [t['artists'][0] for t in result]
+        self.assertTrue(all(artists.count(a) <= 2 for a in artists))
+
+    def test_wave_diversity_and_discover(self):
+        worker = self.wave_worker()
+        worker.client.get_watch_playlist = lambda **k: {'tracks': [
+            {'videoId': 'k%d' % i, 'title': 'K', 'artists': [{'name': 'Same'}]} for i in range(5)]
+            + [{'videoId': 'n%d' % i, 'title': 'N', 'artists': [{'name': 'New%d' % i}]} for i in range(3)]}
+        self.assertLessEqual(len([t for t in worker.call('waveNext', {})['tracks'] if t['artists'] == ['Same']]), 2)
+        for i in range(5):
+            worker.taste.log_play({'videoId': 'k%d' % i, 'title': 'K', 'artists': ['Same']}, 200000, 200000, 'other', False)
+        result = worker.call('waveNext', {'character': 'discover', 'count': 3})['tracks']
+        self.assertTrue(all(t['videoId'].startswith('n') for t in result))
+
+    def test_wave_bad_input(self):
+        with self.assertRaises(catalog.WorkerError) as exc:
+            self.wave_worker().call('waveNext', {'mood': 'bogus'})
+        self.assertEqual(exc.exception.code, 'bad_request')
+
 
 if __name__ == '__main__':
     unittest.main()

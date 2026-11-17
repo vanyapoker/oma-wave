@@ -54,7 +54,9 @@ Page {
 
     StackLayout {
         anchors.fill: parent
-        anchors.margins: 12
+        anchors.leftMargin: 20
+        anchors.rightMargin: 20
+        anchors.topMargin: 12
         visible: catalog.signedIn
         currentIndex: tabs.currentIndex
 
@@ -67,27 +69,55 @@ Page {
                 tracks: root.lib.liked
                 position: index
             }
+            Text {
+                anchors.centerIn: parent
+                visible: parent.count === 0 && !catalog.busy
+                text: qsTr("No liked songs yet")
+                color: "#a0a0a8"
+                textFormat: Text.PlainText
+            }
         }
         GridView {
             clip: true
-            cellWidth: 172
+            cellWidth: Math.floor(width / Math.max(1, Math.floor(width / 172)))
             cellHeight: 226
             model: root.lib.playlists || []
             delegate: CardTile { item: modelData }
+            Text {
+                anchors.centerIn: parent
+                visible: parent.count === 0 && !catalog.busy
+                text: qsTr("No playlists")
+                color: "#a0a0a8"
+                textFormat: Text.PlainText
+            }
         }
         GridView {
             clip: true
-            cellWidth: 172
+            cellWidth: Math.floor(width / Math.max(1, Math.floor(width / 172)))
             cellHeight: 226
             model: root.lib.albums || []
             delegate: CardTile { item: modelData }
+            Text {
+                anchors.centerIn: parent
+                visible: parent.count === 0 && !catalog.busy
+                text: qsTr("No saved albums")
+                color: "#a0a0a8"
+                textFormat: Text.PlainText
+            }
         }
         GridView {
             clip: true
-            cellWidth: 172
+            cellWidth: Math.floor(width / Math.max(1, Math.floor(width / 172)))
             cellHeight: 226
             model: root.lib.artists || []
             delegate: CardTile { item: modelData }
+            Text {
+                anchors.centerIn: parent
+                visible: parent.count === 0 && !catalog.busy
+                text: qsTr("No subscriptions")
+                color: "#a0a0a8"
+                textFormat: Text.PlainText
+            }
         }
     }
 }

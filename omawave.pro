@@ -14,7 +14,8 @@ HEADERS += \
     src/settings.h \
     src/theme.h \
     src/translator.h \
-    src/visualizer.h
+    src/visualizer.h \
+    src/wave.h
 
 SOURCES += \
     src/catalog.cpp \
@@ -27,6 +28,7 @@ SOURCES += \
     src/settings.cpp \
     src/theme.cpp \
     src/translator.cpp \
-    src/visualizer.cpp
+    src/visualizer.cpp \
+    src/wave.cpp
 
 RESOURCES += src/resources.qrc

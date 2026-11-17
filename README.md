@@ -39,6 +39,9 @@ omawave status [--json] | play-pause | next | previous | show | quit
 | 1 / 2 / 3 | Home / Search / Library |
 | / or Ctrl+F | search |
 | U / L | queue / lyrics pane |
+| W | start My Wave (Mood / Activity / Character chips on Home) |
+| F / D | like / dislike (dislike skips) |
+| N | now-playing page |
 | Esc | back |
 | ? | shortcut overlay |
 | Q / Ctrl+Q | hide window / quit |
@@ -52,6 +55,8 @@ omawave status [--json] | play-pause | next | previous | show | quit
 | x / Delete | remove selected row |
 | y | toggle Queue / Lyrics |
 | o | open omawave |
+| w | start My Wave |
+| + / - | like / dislike (dislike skips) |
 | Esc | close |
 
 ## Notes

@@ -28,6 +28,7 @@
 #include "theme.h"
 #include "translator.h"
 #include "visualizer.h"
+#include "wave.h"
 
 namespace {
 const QStringList kCliCommands = {"status", "play-pause", "next", "previous", "show", "quit"};
@@ -131,8 +132,9 @@ int main(int argc, char *argv[]) {
     Catalog catalog;
     Player player(&catalog, &settings);
     Lyrics lyrics(&catalog, &player);
+    Wave wave(&catalog, &player, &settings);
     Visualizer visualizer;
-    ControlServer server(&player, &lyrics, &visualizer);
+    ControlServer server(&player, &lyrics, &visualizer, &wave);
     if (!server.listen())
         return 1;
     Mpris mpris(&player);
@@ -146,6 +148,7 @@ int main(int argc, char *argv[]) {
     ctx->setContextProperty("catalog", &catalog);
     ctx->setContextProperty("player", &player);
     ctx->setContextProperty("lyrics", &lyrics);
+    ctx->setContextProperty("wave", &wave);
     ctx->setContextProperty("visualizer", &visualizer);
     ctx->setContextProperty("startHidden", background);
     engine.load(QUrl("qrc:/Main.qml"));

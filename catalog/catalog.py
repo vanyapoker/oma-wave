@@ -34,6 +34,13 @@ def names(value):
     return [text(x.get('name') if isinstance(x, dict) else x) for x in (value or [])[:200] if x]
 
 
+def byline(value):
+    """A subtitle/author field may be a string, one {'name'} dict or a list of them."""
+    if isinstance(value, dict):
+        value = [value]
+    return ', '.join(names(value)) if isinstance(value, (list, tuple, str)) else ''
+
+
 def duration_ms(obj):
     seconds = obj.get('duration_seconds')
     if seconds is not None:
@@ -140,9 +147,7 @@ def item(obj, kind=None):
     if not identifier:
         return None
     artists = names(obj.get('artists'))
-    subtitle = obj.get('subtitle') or ', '.join(artists) or obj.get('author') or ''
-    if isinstance(subtitle, dict):
-        subtitle = subtitle.get('name', '')
+    subtitle = byline(obj.get('subtitle')) or ', '.join(artists) or byline(obj.get('author'))
     title = text(obj.get('title') or obj.get('name'))
     if kind == 'song' and is_video(obj):
         cleaned, cleaned_artists = clean_video(title, artists)
@@ -553,10 +558,7 @@ class Worker:
             identifier = text(params.get('id'))
             obj = (client.get_album(identifier) if method == 'album' else client.get_playlist(identifier, limit=200) if method == 'playlist' else client.get_artist(identifier))
             artists = names(obj.get('artists'))
-            author = obj.get('author') or ''
-            if isinstance(author, dict):
-                author = author.get('name', '')
-            subtitle = '' if method == 'artist' else text(obj.get('subtitle') or ', '.join(artists) or author)
+            subtitle = '' if method == 'artist' else text(byline(obj.get('subtitle')) or ', '.join(artists) or byline(obj.get('author')))
             raw_tracks = obj.get('tracks') or obj.get('songs') or []
             if isinstance(raw_tracks, dict):
                 raw_tracks = raw_tracks.get('results') or []

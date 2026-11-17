@@ -28,11 +28,7 @@ ApplicationWindow {
         : lyrics.state === "error" ? qsTr("Could not load lyrics") : ""
 
     function present() { show(); raise(); requestActivate() }
-    function fmt(ms) {
-        const s = Math.max(0, Math.floor(ms / 1000))
-        const m = Math.floor(s / 60), r = s % 60
-        return m + ":" + (r < 10 ? "0" : "") + r
-    }
+
     function navigate(name) {
         stack.replace(null, name === "search" ? searchPage : name === "library" ? libraryPage : homePage)
         sidebar.current = name
@@ -46,6 +42,11 @@ ApplicationWindow {
         Qt.callLater(function() { if (stack.currentItem && stack.currentItem.focusSearch) stack.currentItem.focusSearch() })
     }
     function togglePane(name) { pane = pane === name ? "" : name }
+    function goBack() { if (stack.depth > 1) stack.pop() }
+    function openNowPlaying() {
+        if (!(stack.currentItem && stack.currentItem.isNowPlaying))
+            stack.push(nowPlayingPage)
+    }
 
     // Quitting closes every window first, so the hide-on-close below must step aside.
     property bool quitting: false
@@ -72,6 +73,10 @@ ApplicationWindow {
     Shortcut { sequence: "Ctrl+F"; context: Qt.ApplicationShortcut; onActivated: win.focusSearch() }
     Shortcut { sequence: "U"; context: Qt.ApplicationShortcut; enabled: !win.typing; onActivated: win.togglePane("queue") }
     Shortcut { sequence: "L"; context: Qt.ApplicationShortcut; enabled: !win.typing; onActivated: win.togglePane("lyrics") }
+    Shortcut { sequence: "W"; context: Qt.ApplicationShortcut; enabled: !win.typing; onActivated: wave.start() }
+    Shortcut { sequence: "F"; context: Qt.ApplicationShortcut; enabled: !win.typing; onActivated: wave.toggleLike() }
+    Shortcut { sequence: "D"; context: Qt.ApplicationShortcut; enabled: !win.typing; onActivated: wave.dislike() }
+    Shortcut { sequence: "N"; context: Qt.ApplicationShortcut; enabled: !win.typing; onActivated: win.openNowPlaying() }
     Shortcut {
         sequence: "Esc"
         context: Qt.ApplicationShortcut
@@ -88,6 +93,7 @@ ApplicationWindow {
     Component { id: searchPage; SearchPage {} }
     Component { id: libraryPage; LibraryPage { onSignInRequested: signIn.open() } }
     Component { id: collectionPage; CollectionPage {} }
+    Component { id: nowPlayingPage; NowPlayingPage {} }
 
     // Right-to-left languages mirror the window; the Translator sets the
     // application's layout direction.
@@ -123,7 +129,7 @@ ApplicationWindow {
                     Text {
                         anchors.fill: parent
                         anchors.leftMargin: 12
-                        anchors.rightMargin: 12
+                        anchors.rightMargin: 40
                         verticalAlignment: Text.AlignVCenter
                         elide: Text.ElideRight
                         color: "white"
@@ -133,6 +139,17 @@ ApplicationWindow {
                     MouseArea {
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
+                        onClicked: { player.clearError(); catalog.clearError(); lyrics.clearError() }
+                    }
+                    IconButton {
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 32
+                        height: 32
+                        padding: 0
+                        name: "close"
+                        size: 18
+                        tip: qsTr("Dismiss")
                         onClicked: { player.clearError(); catalog.clearError(); lyrics.clearError() }
                     }
                 }
@@ -160,6 +177,7 @@ ApplicationWindow {
             anchors.bottom: parent.bottom
             height: 72
             pane: win.pane
+            onNowPlayingRequested: win.openNowPlaying()
             onTogglePane: function(name) { win.togglePane(name) }
         }
     }

@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Layouts
+import QtQuick.Controls.impl
 
 Rectangle {
     color: "#141416"
@@ -42,8 +43,9 @@ Rectangle {
 
                 Rectangle {
                     anchors.fill: parent
-                    color: isCurrent ? Qt.rgba(1, 1, 1, 0.08) : "transparent"
+                    color: isCurrent ? Qt.rgba(1, 1, 1, 0.08) : rowHover.hovered ? Qt.rgba(1, 1, 1, 0.04) : "transparent"
                 }
+                HoverHandler { id: rowHover }
                 MouseArea {
                     anchors.fill: parent
                     onClicked: player.jump(index)
@@ -53,11 +55,13 @@ Rectangle {
                     anchors.leftMargin: 8
                     anchors.rightMargin: 8
                     spacing: 8
-                    Text {
+                    IconImage {
                         // Drag handle: reorders by dropping the row where the pointer ends.
-                        text: "\u2261"
+                        Layout.preferredWidth: 20
+                        Layout.preferredHeight: 20
+                        source: "qrc:/icons/drag_indicator.svg"
+                        sourceSize: Qt.size(40, 40)
                         color: "#a0a0a8"
-                        font.pixelSize: 20
                         MouseArea {
                             id: grab
                             anchors.fill: parent
@@ -76,6 +80,12 @@ Rectangle {
                             }
                             onCanceled: row.dragOffset = 0
                         }
+                    }
+                    RoundedImage {
+                        Layout.preferredWidth: 38
+                        Layout.preferredHeight: 38
+                        source: thumb || ""
+                        radius: 4
                     }
                     ColumnLayout {
                         Layout.fillWidth: true
@@ -96,8 +106,13 @@ Rectangle {
                             textFormat: Text.PlainText
                         }
                     }
-                    ToolButton {
-                        text: "\u2715"
+                    IconButton {
+                        name: "close"
+                        size: 18
+                        tint: "#a0a0a8"
+                        tip: qsTr("Remove")
+                        opacity: rowHover.hovered ? 1 : 0
+                        enabled: rowHover.hovered
                         onClicked: player.removeAt(index)
                     }
                 }

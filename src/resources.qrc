@@ -14,6 +14,36 @@
         <file alias="LyricsPane.qml">LyricsPane.qml</file>
         <file alias="SignInDialog.qml">SignInDialog.qml</file>
         <file alias="ShortcutsOverlay.qml">ShortcutsOverlay.qml</file>
+        <file alias="Format.js">Format.js</file>
+        <file alias="icons/account_circle.svg">icons/account_circle.svg</file>
+        <file alias="icons/arrow_back.svg">icons/arrow_back.svg</file>
+        <file alias="icons/close.svg">icons/close.svg</file>
+        <file alias="icons/drag_indicator.svg">icons/drag_indicator.svg</file>
+        <file alias="icons/graphic_eq.svg">icons/graphic_eq.svg</file>
+        <file alias="icons/home.svg">icons/home.svg</file>
+        <file alias="icons/library_music.svg">icons/library_music.svg</file>
+        <file alias="icons/lyrics.svg">icons/lyrics.svg</file>
+        <file alias="icons/more_vert.svg">icons/more_vert.svg</file>
+        <file alias="icons/pause.svg">icons/pause.svg</file>
+        <file alias="icons/pause_fill.svg">icons/pause_fill.svg</file>
+        <file alias="icons/play_arrow.svg">icons/play_arrow.svg</file>
+        <file alias="icons/play_arrow_fill.svg">icons/play_arrow_fill.svg</file>
+        <file alias="icons/queue_music.svg">icons/queue_music.svg</file>
+        <file alias="icons/refresh.svg">icons/refresh.svg</file>
+        <file alias="icons/search.svg">icons/search.svg</file>
+        <file alias="icons/skip_next.svg">icons/skip_next.svg</file>
+        <file alias="icons/skip_previous.svg">icons/skip_previous.svg</file>
+        <file alias="icons/thumb_down.svg">icons/thumb_down.svg</file>
+        <file alias="icons/thumb_down_fill.svg">icons/thumb_down_fill.svg</file>
+        <file alias="icons/thumb_up.svg">icons/thumb_up.svg</file>
+        <file alias="icons/thumb_up_fill.svg">icons/thumb_up_fill.svg</file>
+        <file alias="icons/volume_off.svg">icons/volume_off.svg</file>
+        <file alias="icons/volume_up.svg">icons/volume_up.svg</file>
+        <file alias="IconButton.qml">IconButton.qml</file>
+        <file alias="RoundedImage.qml">RoundedImage.qml</file>
+        <file alias="WaveHero.qml">WaveHero.qml</file>
+        <file alias="LyricsView.qml">LyricsView.qml</file>
+        <file alias="NowPlayingPage.qml">NowPlayingPage.qml</file>
         <file alias="i18n/en.json">i18n/en.json</file>
     </qresource>
 </RCC>

@@ -10,13 +10,14 @@
 class Player;
 class Lyrics;
 class Visualizer;
+class Wave;
 
 // Newline-delimited JSON control protocol v1 on a per-user local socket. It serves
 // the bar plugin and the CLI.
 class ControlServer : public QObject {
     Q_OBJECT
 public:
-    ControlServer(Player *player, Lyrics *lyrics, Visualizer *visualizer, const QString &socketPath = {},
+    ControlServer(Player *player, Lyrics *lyrics, Visualizer *visualizer, Wave *wave, const QString &socketPath = {},
                   QObject *parent = nullptr);
 
     bool listen();
@@ -45,6 +46,7 @@ private:
     Player *m_player;
     Lyrics *m_lyrics;
     Visualizer *m_visualizer;
+    Wave *m_wave;
     QString m_path;
     QLocalServer m_server;
     QList<Client *> m_clients;

@@ -7,8 +7,26 @@ import QtQuick.Layouts
 Page {
     id: root
     background: null
+    header: Item {
+        height: 48
+        IconButton {
+            x: 8
+            anchors.verticalCenter: parent.verticalCenter
+            name: "arrow_back"
+            tip: qsTr("Back")
+            onClicked: ApplicationWindow.window.goBack()
+        }
+    }
     readonly property var detail: catalog.detail
     readonly property var tracks: detail.tracks || []
+    function shuffled() {
+        const list = root.tracks.slice()
+        for (let i = list.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1))
+            const t = list[i]; list[i] = list[j]; list[j] = t
+        }
+        return list
+    }
 
     ListView {
         id: list
@@ -26,21 +44,12 @@ Page {
             RowLayout {
                 width: parent.width
                 spacing: 20
-                Rectangle {
+                RoundedImage {
                     Layout.preferredWidth: 160
                     Layout.preferredHeight: 160
-                    Layout.topMargin: 20
-                    color: "#232326"
-                    radius: root.detail.kind === "artist" ? 80 : Math.min(4, theme.radius)
-                    clip: true
-                    Image {
-                        anchors.fill: parent
-                        source: root.detail.thumb || ""
-                        asynchronous: true
-                        fillMode: Image.PreserveAspectCrop
-                        sourceSize.width: 320
-                        sourceSize.height: 320
-                    }
+                    source: root.detail.thumb || ""
+                    radius: 8
+                    circle: root.detail.kind === "artist"
                 }
                 ColumnLayout {
                     Layout.fillWidth: true
@@ -68,11 +77,34 @@ Page {
                         visible: root.tracks.length > 0
                         textFormat: Text.PlainText
                     }
-                    Button {
-                        text: qsTr("Play all")
-                        highlighted: true
-                        enabled: root.tracks.length > 0
-                        onClicked: player.playTracks(root.tracks, 0, false)
+                    RowLayout {
+                        spacing: 12
+                        Rectangle {
+                            Layout.preferredWidth: 48
+                            Layout.preferredHeight: 48
+                            radius: 24
+                            color: root.tracks.length > 0 ? theme.accent : Qt.rgba(1, 1, 1, 0.15)
+                            IconButton {
+                                anchors.centerIn: parent
+                                width: 48
+                                height: 48
+                                padding: 0
+                                name: "play_arrow"
+                                filled: true
+                                size: 28
+                                tint: theme.accentForeground
+                                enabled: root.tracks.length > 0
+                                tip: qsTr("Play all")
+                                onClicked: player.playTracks(root.tracks, 0, false)
+                            }
+                        }
+                        IconButton {
+                            name: "shuffle"
+                            size: 24
+                            enabled: root.tracks.length > 1
+                            tip: qsTr("Shuffle")
+                            onClicked: player.playTracks(root.shuffled(), 0, false)
+                        }
                     }
                 }
             }
