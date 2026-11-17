@@ -44,43 +44,6 @@ BarWidget {
     visible: false
     onLoaded: { root.injectPanel(); Qt.callLater(root.injectPanel) }
   }
-  // Hover opens the popup; leaving closes it unless a click pinned it.
-  property bool hoverOpened: false
-  readonly property bool panelHovered: panelLoader.item ? panelLoader.item.contentHovered : false
-  onPanelHoveredChanged: {
-    if (panelHovered) hoverCloseTimer.stop()
-    else if (hoverOpened) hoverCloseTimer.restart()
-  }
-  onOpenedChanged: if (!opened) hoverOpened = false
-  HoverHandler {
-    id: widgetHover
-    onHoveredChanged: {
-      if (hovered) {
-        hoverCloseTimer.stop()
-        if (root.setting("openOnHover", true) && !root.opened) hoverOpenTimer.restart()
-      } else {
-        hoverOpenTimer.stop()
-        if (root.hoverOpened) hoverCloseTimer.restart()
-      }
-    }
-  }
-  Timer {
-    id: hoverOpenTimer
-    interval: 150
-    onTriggered: {
-      if (!widgetHover.hovered || root.opened || !panelLoader.item) return
-      if (root.bar) root.bar.hideTooltip(root)
-      panelLoader.item.open()
-      root.hoverOpened = true
-    }
-  }
-  Timer {
-    id: hoverCloseTimer
-    interval: 400
-    onTriggered: {
-      if (root.hoverOpened && !widgetHover.hovered && !root.panelHovered && panelLoader.item) panelLoader.item.close()
-    }
-  }
   Row {
     id: row
     z: 1
@@ -145,10 +108,7 @@ BarWidget {
     acceptedButtons: Qt.LeftButton | Qt.MiddleButton | Qt.RightButton
     cursorShape: Qt.PointingHandCursor
     onClicked: function(mouse) {
-      if (mouse.button === Qt.LeftButton) {
-        if (root.hoverOpened) root.hoverOpened = false
-        else if (panelLoader.item) panelLoader.item.toggle()
-      }
+      if (mouse.button === Qt.LeftButton) { if (panelLoader.item) panelLoader.item.toggle() }
       else if (mouse.button === Qt.MiddleButton) backend.send("playPause")
       else if (backend.connected) backend.send("show")
       else if (root.bar) root.bar.run("omawave")

@@ -24,8 +24,6 @@ Panel {
   // omarchy writes shell.json; the bar widget re-reads its settings, so the bar is the live preview.
   function applyOpt(key, value) { if (bar) bar.run("omarchy bar set vp.omawave " + key + " " + value + " --json") }
   Timer { id: widthTimer; interval: 120; onTriggered: root.applyOpt("maxLabelWidth", root.pendingWidth) }
-  property bool contentHovered: false
-  onOpenedChanged: if (!opened) contentHovered = false
   property int cursor: 0
   readonly property var playerState: backend && backend.connected ? backend.state : null
   readonly property var track: playerState ? playerState.track : null
@@ -89,7 +87,6 @@ Panel {
       anchors.fill: parent
       implicitHeight: column.implicitHeight
       property bool returnHandled: false
-      HoverHandler { onHoveredChanged: root.contentHovered = hovered }
       onCloseRequested: root.close()
       onTabRequested: function(direction) { root.switchPanel(direction) }
       onReturnRequested: returnHandled = true
@@ -279,7 +276,7 @@ Panel {
           }
           Item {
             width: parent.width
-            height: Style.space(root.showSettings ? 360 : 240)
+            height: Style.space(root.showSettings ? 300 : 240)
             ListView {
               id: queueList
               anchors.fill: parent
@@ -363,13 +360,6 @@ Panel {
                 opacity: 0.7
                 font.family: root.bar ? root.bar.fontFamily : Style.font.family
                 font.pixelSize: Style.font.caption
-              }
-              Toggle {
-                width: parent.width
-                label: strings.t("openOnHover")
-                checked: !!root.opt("openOnHover", true)
-                foreground: root.bar ? root.bar.foreground : Commons.Color.foreground
-                onClicked: root.applyOpt("openOnHover", !checked)
               }
               Toggle {
                 width: parent.width
