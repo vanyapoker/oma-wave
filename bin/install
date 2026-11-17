@@ -1,0 +1,11 @@
+#!/bin/sh
+set -eu
+
+ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+"$ROOT/bin/build"
+(cd "$ROOT/pkgbuild" && makepkg -fsi "$@")
+systemctl --user enable --now omawave.service
+mkdir -p "$HOME/.config/omarchy/plugins"
+ln -sfn /usr/share/omawave/plugin "$HOME/.config/omarchy/plugins/vp.omawave"
+omarchy plugin enable vp.omawave --section centerBegin
+omarchy-shell shell rescanPlugins

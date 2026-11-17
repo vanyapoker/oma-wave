@@ -1,0 +1,28 @@
+pkgname=omawave
+pkgver=0.1.0
+pkgrel=1
+pkgdesc='YouTube Music player with an Omarchy bar widget'
+arch=('x86_64' 'aarch64')
+license=('MIT')
+depends=('qt6-base' 'qt6-declarative' 'qt6-wayland' 'mpv' 'yt-dlp' 'python' 'python-ytmusicapi' 'python-requests' 'cava')
+makedepends=('gcc' 'make')
+source=()
+sha256sums=()
+
+build() {
+  cd "$startdir/.."
+  ./bin/build
+}
+
+package() {
+  cd "$startdir/.."
+  install -Dm755 build/omawave "$pkgdir/usr/bin/omawave"
+  install -Dm755 catalog/catalog.py "$pkgdir/usr/lib/omawave/catalog.py"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm644 "$startdir/omawave.svg" "$pkgdir/usr/share/icons/hicolor/scalable/apps/omawave.svg"
+  install -Dm644 "$startdir/omawave.desktop" "$pkgdir/usr/share/applications/omawave.desktop"
+  install -Dm644 "$startdir/omawave.service" "$pkgdir/usr/lib/systemd/user/omawave.service"
+  find plugin -type f -not -path 'plugin/tests/*' | while read -r f; do
+    install -Dm644 "$f" "$pkgdir/usr/share/omawave/$f"
+  done
+}

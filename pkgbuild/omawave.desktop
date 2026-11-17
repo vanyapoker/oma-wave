@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=omawave
+Comment=YouTube Music player
+Exec=omawave
+Icon=omawave
+Terminal=false
+Categories=AudioVideo;Audio;Player;
+StartupWMClass=omawave

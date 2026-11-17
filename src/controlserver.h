@@ -1,0 +1,52 @@
+#pragma once
+
+#include <QJsonObject>
+#include <QList>
+#include <QLocalServer>
+#include <QLocalSocket>
+#include <QObject>
+#include <QTimer>
+
+class Player;
+class Lyrics;
+class Visualizer;
+
+// Newline-delimited JSON control protocol v1 on a per-user local socket. It serves
+// the bar plugin and the CLI.
+class ControlServer : public QObject {
+    Q_OBJECT
+public:
+    ControlServer(Player *player, Lyrics *lyrics, Visualizer *visualizer, const QString &socketPath = {},
+                  QObject *parent = nullptr);
+
+    bool listen();
+    int levelSubscribers() const;
+    QJsonObject stateJson() const;
+
+signals:
+    void showRequested();
+    void quitRequested();
+    void levelSubscribersChanged();
+
+private:
+    struct Client {
+        QLocalSocket *socket;
+        QByteArray buffer;
+        bool levels = false;
+    };
+
+    void onNewConnection();
+    void onData(Client *client);
+    void handle(Client *client, const QJsonObject &message);
+    void sendTo(QLocalSocket *socket, const QJsonObject &object);
+    void broadcast(const QJsonObject &object, bool onlyLevelClients = false);
+    void broadcastState();
+
+    Player *m_player;
+    Lyrics *m_lyrics;
+    Visualizer *m_visualizer;
+    QString m_path;
+    QLocalServer m_server;
+    QList<Client *> m_clients;
+    QTimer m_debounce, m_positionTimer;
+};
