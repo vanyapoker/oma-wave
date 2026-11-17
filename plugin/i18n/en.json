@@ -22,5 +22,6 @@
   "showVisualizer": "Show visualizer",
   "showTitle": "Show title",
   "showControls": "Show playback buttons",
-  "titleWidth": "Title width"
+  "titleWidth": "Title width",
+  "openOnHover": "Open on hover"
 }

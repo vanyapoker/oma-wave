@@ -14,12 +14,13 @@
     "category": "Media",
     "allowMultiple": false,
     "defaultSection": "centerBegin",
-    "defaults": { "maxLabelWidth": 120, "showTitle": true, "showControls": true },
+    "defaults": { "maxLabelWidth": 120, "showTitle": true, "showControls": true, "openOnHover": true },
     "schema": [
       { "key": "maxLabelWidth", "type": "integer", "label": "Title width", "min": 60, "max": 400, "step": 10, "defaultValue": 120 },
       { "key": "showTitle", "type": "boolean", "label": "Show title", "defaultValue": true },
       { "key": "showVisualizer", "type": "boolean", "label": "Show visualizer", "defaultValue": true },
-      { "key": "showControls", "type": "boolean", "label": "Show playback buttons", "defaultValue": true }
+      { "key": "showControls", "type": "boolean", "label": "Show playback buttons", "defaultValue": true },
+      { "key": "openOnHover", "type": "boolean", "label": "Open popup on hover", "defaultValue": true }
     ]
   }
 }

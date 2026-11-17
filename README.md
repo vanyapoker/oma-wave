@@ -5,7 +5,7 @@
 A YouTube Music player for [Omarchy](https://omarchy.org), in two parts:
 
 - **`omawave`**, a Qt 6 app that owns playback (mpv + yt-dlp) with Home, Search, Library, album, artist and playlist pages, a queue and synced lyrics. Closing the window hides it; the music continues. MPRIS is built in, so media keys work.
-- **`vp.omawave`**, an Omarchy bar widget: a live audio visualizer (via `cava`), a scrolling "title · artist" label, play/pause, next and like buttons, and a mini-player popup with seek, transport, queue, lyrics and a Settings tab that changes the widget live.
+- **`vp.omawave`**, an Omarchy bar widget: a live audio visualizer (via `cava`), a scrolling "title · artist" label, play/pause, next and like buttons, and a mini-player popup with seek, transport, queue, lyrics and a Settings tab that changes the widget live. Hover to open the popup; click to keep it open. Hover opening can be disabled in Settings.
 
 ## Install
 
