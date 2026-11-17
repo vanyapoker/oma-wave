@@ -1,0 +1,9 @@
+{
+  "notRunning": "omawave is not running",
+  "start": "Start omawave",
+  "open": "Open omawave",
+  "queue": "Queue",
+  "lyrics": "Lyrics",
+  "noLyrics": "No lyrics found",
+  "nothingPlaying": "Nothing playing"
+}

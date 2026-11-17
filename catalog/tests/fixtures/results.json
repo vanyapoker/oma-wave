@@ -1,0 +1,13 @@
+{
+  "songs": [
+    {"videoId":"one","title":"Song","artists":[{"name":"Artist"}],"album":{"name":"Album","id":"MPRE1"},"duration":"3:05","thumbnails":[{"url":"small"},{"url":"large"}]},
+    {"title":"No ID"}
+  ],
+  "items": [
+    {"videoId":"one","title":"Song","artists":[{"name":"Artist"}]},
+    {"browseId":"MPRE1","title":"Album"},
+    {"playlistId":"PL1","title":"Playlist"},
+    {"browseId":"UC1","title":"Artist"},
+    {"title":"Missing"}
+  ]
+}
