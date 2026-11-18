@@ -9,6 +9,8 @@ A YouTube Music player for [Omarchy](https://omarchy.org), in two parts:
 
 The app uses Qt Quick's software renderer; it does not need GPU rendering for its interface.
 
+After one minute paused or idle, omawave stops mpv to release its memory. The queue and position remain available; the next playback or queue command restarts mpv and restores them, so it may take longer.
+
 ## Install
 
 ```sh

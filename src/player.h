@@ -100,9 +100,15 @@ signals:
     // Emitted when playTracks replaces the whole queue.
     void queueReplaced();
 
+private slots:
+    void suspendMpv();
+
 private:
     void startMpv();
     void connectSocket();
+    void sendNow(const QVariantList &command);
+    void finishRestore();
+    void updateIdleTimer();
     void send(const QVariantList &command);
     void onData();
     void handleMessage(const QJsonObject &object);
@@ -127,6 +133,9 @@ private:
     bool m_connected = false;
     int m_connectAttempts = 0;
     QTimer m_retry;
+    QTimer m_idleTimer;
+    bool m_suspended = false;
+    bool m_restoring = false;
     QElapsedTimer m_mpvStarted, m_positionClock;
     bool m_stopping = false;
     int m_requestId = 0;

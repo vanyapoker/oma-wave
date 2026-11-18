@@ -69,6 +69,10 @@ Player::Player(Catalog *catalog, Settings *settings, const QString &mpvPath, con
       m_volume(settings->volume()) {
     m_retry.setInterval(50);
     connect(&m_retry, &QTimer::timeout, this, &Player::connectSocket);
+    m_idleTimer.setSingleShot(true);
+    m_idleTimer.setInterval(60000);
+    connect(&m_idleTimer, &QTimer::timeout, this, &Player::suspendMpv);
+    connect(this, &Player::playingChanged, this, &Player::updateIdleTimer);
     connect(&m_socket, &QLocalSocket::connected, this, [this] {
         m_retry.stop();
         m_connected = true;
@@ -77,10 +81,33 @@ Player::Player(Catalog *catalog, Settings *settings, const QString &mpvPath, con
         for (const auto &[id, name] : observed)
             m_socket.write(QJsonDocument(QJsonObject{{"command", QJsonArray{"observe_property", id, name}}})
                                .toJson(QJsonDocument::Compact) + "\n");
-        for (const auto &line : std::as_const(m_outbox))
-            m_socket.write(line);
-        m_outbox.clear();
         applyCookies();
+        if (m_restoring) {
+            sendNow({"set_property", "pause", true});
+            const int current = m_queue.current();
+            if (current >= 0) {
+                const QVariantMap item = m_queue.row(current);
+                const QString url = urlFor(item);
+                if (!m_meta.contains(url)) m_meta.insert(url, item);
+                sendNow({"loadfile", url, "replace"});
+            }
+            for (int i = 0; i < m_queue.rowCount(); ++i) {
+                if (i == current) continue;
+                const QVariantMap item = m_queue.row(i);
+                const QString url = urlFor(item);
+                if (!m_meta.contains(url)) m_meta.insert(url, item);
+                sendNow({"loadfile", url, "append"});
+            }
+            if (current > 0)
+                sendNow({"playlist-move", 0, current + 1});
+            if (current < 0)
+                finishRestore();
+        } else {
+            for (const auto &line : std::as_const(m_outbox))
+                m_socket.write(line);
+            m_outbox.clear();
+            updateIdleTimer();
+        }
     });
     connect(&m_socket, &QLocalSocket::readyRead, this, &Player::onData);
     connect(&m_mpv, &QProcess::finished, this, &Player::onMpvFinished);
@@ -101,6 +128,7 @@ Player::~Player() { shutdown(); }
 void Player::shutdown() {
     m_stopping = true;
     m_retry.stop();
+    m_idleTimer.stop();
     if (m_mpv.state() != QProcess::NotRunning) {
         m_mpv.terminate();
         if (!m_mpv.waitForFinished(1000)) {
@@ -153,6 +181,17 @@ void Player::connectSocket() {
 }
 
 void Player::onMpvFinished() {
+    if (m_suspended && !m_stopping) {
+        m_retry.stop();
+        m_socket.abort();
+        m_connected = false;
+        if (!m_outbox.isEmpty()) {
+            m_suspended = false;
+            m_restoring = true;
+            startMpv();
+        }
+        return;
+    }
     if (m_stopping)
         return;
     const bool longLived = m_mpvStarted.hasExpired(60000);
@@ -172,22 +211,68 @@ void Player::onMpvFinished() {
         startMpv();
 }
 
+void Player::sendNow(const QVariantList &command) {
+    const QJsonObject object{{"command", QJsonArray::fromVariantList(command)}, {"request_id", ++m_requestId}};
+    m_socket.write(QJsonDocument(object).toJson(QJsonDocument::Compact) + "\n");
+}
+
 void Player::send(const QVariantList &command) {
     const QJsonObject object{{"command", QJsonArray::fromVariantList(command)}, {"request_id", ++m_requestId}};
     const QByteArray line = QJsonDocument(object).toJson(QJsonDocument::Compact) + "\n";
-    if (m_connected)
+    m_idleTimer.stop();
+    if (m_connected && !m_suspended && !m_restoring) {
         m_socket.write(line);
-    else
+    } else {
         m_outbox.append(line);
+        if (m_suspended && m_mpv.state() == QProcess::NotRunning) {
+            m_suspended = false;
+            m_restoring = true;
+            startMpv();
+        }
+    }
+    if (!m_restoring && !m_suspended) updateIdleTimer();
+}
+
+void Player::updateIdleTimer() {
+    if (!m_stopping && !m_suspended && !m_restoring && m_connected && !playing())
+        m_idleTimer.start();
+    else
+        m_idleTimer.stop();
+}
+
+void Player::suspendMpv() {
+    if (playing() || !m_connected || m_restoring || m_stopping) return;
+    m_suspended = true;
+    m_idleTimer.stop();
+    m_mpv.terminate();
+}
+
+void Player::finishRestore() {
+    if (!m_restoring) return;
+    if (m_queue.current() >= 0 && m_positionMs > 0)
+        sendNow({"seek", m_positionMs / 1000.0, "absolute+exact"});
+    m_restoring = false;
+    for (const auto &line : std::as_const(m_outbox))
+        m_socket.write(line);
+    m_outbox.clear();
+    // Observations during reconstruction were ignored; request fresh values.
+    const QList<QPair<int, const char *>> observed = {{1, "pause"}, {2, "time-pos"}, {3, "duration"},
+        {4, "playlist"}, {5, "volume"}, {6, "paused-for-cache"}, {7, "idle-active"}};
+    for (const auto &[id, name] : observed) {
+        sendNow({"unobserve_property", id});
+        m_socket.write(QJsonDocument(QJsonObject{{"command", QJsonArray{"observe_property", id, name}}})
+                           .toJson(QJsonDocument::Compact) + "\n");
+    }
+    updateIdleTimer();
 }
 
 void Player::applyCookies() {
     if (!m_connected)
         return;
     if (m_catalog && m_catalog->signedIn())
-        send({"change-list", "ytdl-raw-options", "set", "cookies=" + Paths::cookiesFile()});
+        sendNow({"change-list", "ytdl-raw-options", "set", "cookies=" + Paths::cookiesFile()});
     else
-        send({"change-list", "ytdl-raw-options", "clr", ""});
+        sendNow({"change-list", "ytdl-raw-options", "clr", ""});
 }
 
 void Player::onData() {
@@ -203,11 +288,16 @@ void Player::onData() {
 
 void Player::handleMessage(const QJsonObject &o) {
     const QString event = o.value("event").toString();
-    if (event == "property-change") {
-        onProperty(o.value("name").toString(), o.value("data").toVariant(), o.value("data"));
+    if (event == "file-loaded" && m_restoring) {
+        finishRestore();
+    } else if (event == "property-change") {
+        if (!m_suspended && !m_restoring)
+            onProperty(o.value("name").toString(), o.value("data").toVariant(), o.value("data"));
     } else if (event == "end-file" && o.value("reason").toString() == "error") {
+        if (m_restoring) finishRestore();
         setError(tr("Could not play “%1”").arg(track().value("title").toString()));
     } else if (event == "seek") {
+        m_positionClock.invalidate();
         emit seeked(m_positionMs);
     }
 }

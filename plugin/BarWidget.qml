@@ -52,12 +52,22 @@ BarWidget {
     anchors.centerIn: parent
     spacing: Style.space(6)
     Visualizer {
+      id: visualizer
       visible: !!root.setting("showVisualizer", true)
       anchors.verticalCenter: parent.verticalCenter
       bar: root.bar
       levels: backend.levels
       connected: backend.connected
       playing: root.playing
+    }
+    Text {
+      anchors.verticalCenter: parent.verticalCenter
+      visible: !visualizer.visible && !scrollClip.visible && !controls.visible
+      text: "♪"
+      color: root.bar ? root.bar.barForeground : "white"
+      font.family: root.bar ? root.bar.fontFamily : Style.font.family
+      font.pixelSize: Style.font.body
+      textFormat: Text.PlainText
     }
     Item {
       id: scrollClip

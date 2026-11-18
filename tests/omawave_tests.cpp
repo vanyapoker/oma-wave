@@ -12,6 +12,7 @@
 #include "controlserver.h"
 #include "lyrics.h"
 #include "player.h"
+#include "paths.h"
 #include "settings.h"
 #include "theme.h"
 #include "translator.h"
@@ -160,6 +161,55 @@ private slots:
 
         player.moveTrack(1, 0);
         QTRY_COMPARE(player.queue()->row(0).value("title").toString(), QString("c"));
+    }
+
+    void pausedQueueSurvivesMpvSuspension() {
+        Settings settings(m_runtime.path());
+        Player player(nullptr, &settings, {}, {"--ao=null"});
+        player.playTracks(m_tracks, 1, false);
+        QTRY_COMPARE(player.queueIndex(), 1);
+        QTRY_VERIFY(player.playing());
+        player.seek(900);
+        QTRY_VERIFY(player.positionMs() >= 500);
+        player.togglePause();
+        QTRY_VERIFY(!player.playing());
+        const qint64 pausedAt = player.positionMs();
+        QVERIFY(QMetaObject::invokeMethod(&player, "suspendMpv"));
+        auto mpvStopped = [] {
+            QLocalSocket socket;
+            socket.connectToServer(Paths::mpvSocket());
+            return !socket.waitForConnected(50);
+        };
+        QTRY_VERIFY(mpvStopped());
+        QCOMPARE(player.queueCount(), 3);
+        QCOMPARE(player.track().value("title").toString(), QString("b"));
+        QCOMPARE(player.positionMs(), pausedAt);
+        QVERIFY(player.error().isEmpty());
+
+        // Queue edits wake mpv but do not resume playback.
+        player.moveTrack(0, 2);
+        QTRY_COMPARE(player.queueIndex(), 0);
+        QCOMPARE(player.track().value("title").toString(), QString("b"));
+        QVERIFY(!player.playing());
+        QTRY_VERIFY(player.positionMs() >= 500);
+        player.togglePause();
+        QTRY_VERIFY(player.playing());
+        QCOMPARE(player.queueCount(), 3);
+    }
+
+    void resumeWhileMpvIsStopping() {
+        Settings settings(m_runtime.path());
+        Player player(nullptr, &settings, {}, {"--ao=null"});
+        player.playTracks(m_tracks, 0, false);
+        QTRY_VERIFY(player.playing());
+        player.togglePause();
+        QTRY_VERIFY(!player.playing());
+        QVERIFY(QMetaObject::invokeMethod(&player, "suspendMpv"));
+        player.togglePause();
+        QTRY_VERIFY(player.playing());
+        QCOMPARE(player.queueCount(), 3);
+        QCOMPARE(player.track().value("title").toString(), QString("a"));
+        QVERIFY(player.error().isEmpty());
     }
 
     void controlProtocol() {
