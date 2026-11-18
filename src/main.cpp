@@ -14,6 +14,9 @@
 #include <QSGRendererInterface>
 #include <QTextStream>
 #include <QSocketNotifier>
+#include <QTimer>
+#include <malloc.h>
+#include <memory>
 #include <QUrl>
 #include <csignal>
 #include <sys/socket.h>
@@ -142,37 +145,65 @@ int main(int argc, char *argv[]) {
         return 1;
     Mpris mpris(&player);
 
-    QQmlApplicationEngine engine;
-    QObject::connect(&translator, &Translator::changed, &engine, &QQmlEngine::retranslate);
-    auto *ctx = engine.rootContext();
-    ctx->setContextProperty("translator", &translator);
-    ctx->setContextProperty("theme", &theme);
-    ctx->setContextProperty("settings", &settings);
-    ctx->setContextProperty("catalog", &catalog);
-    ctx->setContextProperty("player", &player);
-    ctx->setContextProperty("lyrics", &lyrics);
-    ctx->setContextProperty("wave", &wave);
-    ctx->setContextProperty("visualizer", &visualizer);
-    ctx->setContextProperty("startHidden", background);
-    engine.load(QUrl("qrc:/Main.qml"));
-    if (engine.rootObjects().isEmpty())
-        return 1;
-    auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().first());
+    std::unique_ptr<QQmlApplicationEngine> engine;
+    QQuickWindow *window = nullptr;
 
-    auto show = [window] { QMetaObject::invokeMethod(window, "present"); };
-    QObject::connect(&server, &ControlServer::showRequested, window, show);
-    QObject::connect(&mpris, &Mpris::showRequested, window, show);
-    auto quit = [window] { QMetaObject::invokeMethod(window, "quitApp"); };
-    QObject::connect(&server, &ControlServer::quitRequested, window, quit);
-    QObject::connect(&mpris, &Mpris::quitRequested, window, quit);
-
-    // cava only runs while something can show its output.
+    // Playback and bar subscribers outlive the optional window.
     auto updateVisualizer = [&] {
-        visualizer.setWanted(player.playing() && (server.levelSubscribers() > 0 || window->isVisible()));
+        visualizer.setWanted(player.playing() && (server.levelSubscribers() > 0 || (window && window->isVisible())));
     };
+    auto show = [&]() -> bool {
+        if (window) {
+            QMetaObject::invokeMethod(window, "present");
+            return true;
+        }
+        engine = std::make_unique<QQmlApplicationEngine>();
+        QObject::connect(&translator, &Translator::changed, engine.get(), &QQmlEngine::retranslate);
+        auto *ctx = engine->rootContext();
+        ctx->setContextProperty("translator", &translator);
+        ctx->setContextProperty("theme", &theme);
+        ctx->setContextProperty("settings", &settings);
+        ctx->setContextProperty("catalog", &catalog);
+        ctx->setContextProperty("player", &player);
+        ctx->setContextProperty("lyrics", &lyrics);
+        ctx->setContextProperty("wave", &wave);
+        ctx->setContextProperty("visualizer", &visualizer);
+        engine->load(QUrl("qrc:/Main.qml"));
+        if (engine->rootObjects().isEmpty() ||
+            !(window = qobject_cast<QQuickWindow *>(engine->rootObjects().first()))) {
+            engine.reset();
+            return false;
+        }
+        QObject::connect(window, &QWindow::visibleChanged, &app, [&](bool visible) {
+            updateVisualizer();
+            if (!visible) {
+                QTimer::singleShot(0, &app, [&] {
+                    if (window && !window->isVisible()) {
+                        window = nullptr;
+                        engine.reset();
+                        malloc_trim(0);
+                        updateVisualizer();
+                    }
+                });
+            }
+        });
+        updateVisualizer();
+        QMetaObject::invokeMethod(window, "present");
+        return true;
+    };
+    QObject::connect(&server, &ControlServer::showRequested, &app, [&] { show(); });
+    QObject::connect(&mpris, &Mpris::showRequested, &app, [&] { show(); });
+    auto quit = [&] {
+        if (window) QMetaObject::invokeMethod(window, "quitApp");
+        else app.quit();
+    };
+    QObject::connect(&server, &ControlServer::quitRequested, &app, quit);
+    QObject::connect(&mpris, &Mpris::quitRequested, &app, quit);
     QObject::connect(&player, &Player::playingChanged, &app, updateVisualizer);
     QObject::connect(&server, &ControlServer::levelSubscribersChanged, &app, updateVisualizer);
-    QObject::connect(window, &QWindow::visibleChanged, &app, updateVisualizer);
+
+    if (!background && !show())
+        return 1;
 
     QObject::connect(&app, &QGuiApplication::aboutToQuit, &app, [&] {
         visualizer.setWanted(false);

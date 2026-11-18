@@ -35,6 +35,8 @@ BarWidget {
   Backend {
     id: backend
     wantLevels: root.visible && root.bar && !root.bar.barHidden && !Style.reduceMotion
+                && (root.setting("showVisualizer", true)
+                    || (root.opened && root.track && !root.track.thumb))
     popupOpen: root.opened
   }
   Loader {
@@ -72,14 +74,17 @@ BarWidget {
         font.family: root.bar ? root.bar.fontFamily : Style.font.family
         font.pixelSize: Style.font.body
         anchors.verticalCenter: parent.verticalCenter
-        NumberAnimation on x {
-          running: label.implicitWidth > scrollClip.width && root.playing && root.visible && root.bar && !root.bar.barHidden && !root.opened && !root.vertical && !Style.reduceMotion
-          onRunningChanged: if (!running) label.x = 0
-          loops: Animation.Infinite
-          duration: Style.duration(Math.max(6000, label.implicitWidth * 25))
-          from: scrollClip.width
-          to: -label.implicitWidth
-          easing.type: Easing.Linear
+        onTextChanged: if (scrollTimer.running) x = scrollClip.width
+        Timer {
+          id: scrollTimer
+          interval: 100
+          repeat: true
+          running: scrollClip.visible && label.implicitWidth > scrollClip.width && root.playing && root.visible && root.bar && !root.bar.barHidden && !root.opened && !Style.reduceMotion
+          onRunningChanged: label.x = running ? scrollClip.width : 0
+          onTriggered: {
+            label.x -= 3
+            if (label.x <= -label.implicitWidth) label.x = scrollClip.width
+          }
         }
       }
     }

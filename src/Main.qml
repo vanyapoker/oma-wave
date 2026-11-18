@@ -9,7 +9,7 @@ ApplicationWindow {
     height: 720
     minimumWidth: 760
     minimumHeight: 520
-    visible: !startHidden
+    visible: true
     title: "omawave"
     color: "#0e0e10"
     readonly property bool narrow: width < 900
