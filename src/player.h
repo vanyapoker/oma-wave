@@ -6,6 +6,7 @@
 #include <QLocalSocket>
 #include <QProcess>
 #include <QTimer>
+#include <QTemporaryDir>
 #include <QVariantMap>
 
 class Catalog;
@@ -121,6 +122,11 @@ private:
     bool hasUrl(const QString &url) const;
     void appendUnique(const QVariantList &tracks);
     void maybeAutoplay();
+    void updatePrefetch();
+    void cancelPrefetch();
+    void clearPrefetchMapping();
+    void prefetchFinished(int exitCode, QProcess::ExitStatus status);
+    void releaseRetiredPrefetch();
 
     Catalog *m_catalog;
     Settings *m_settings;
@@ -150,4 +156,9 @@ private:
     QString m_autoplayFor;
     int m_playSerial = 0;
     bool m_autoplay = true;
+    QTemporaryDir m_prefetchDir;
+    QProcess m_prefetch;
+    QTimer m_prefetchTimeout;
+    QString m_prefetchUrl, m_prefetchFile, m_readyUrl, m_readyFile, m_failedPrefetchUrl;
+    QStringList m_retiredPrefetch;
 };

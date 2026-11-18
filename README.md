@@ -11,6 +11,8 @@ The app uses Qt Quick's software renderer; it does not need GPU rendering for it
 
 After one minute paused or idle, omawave stops mpv to release its memory. The queue and position remain available; the next playback or queue command restarts mpv and restores them, so it may take longer.
 
+For faster seeking, mpv stores network audio packets in a temporary disk cache. It also downloads the next YouTube Music track to a temporary cache when possible, up to 32 MiB. Downloads stop after two minutes, and playback falls back to streaming if they fail. Cache files are removed during normal shutdown; an interrupted process can leave files behind.
+
 ## Install
 
 ```sh
