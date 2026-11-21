@@ -52,6 +52,13 @@ ControlServer::ControlServer(Player *player, Lyrics *lyrics, Visualizer *visuali
         broadcast(m);
     });
     m_positionTimer.start();
+    connect(player, &Player::positionChanged, this, [this] {
+        if (m_player->playing())
+            return;
+        auto m = message("position");
+        m["positionMs"] = m_player->positionMs();
+        broadcast(m);
+    });
 
     connect(visualizer, &Visualizer::levelsChanged, this, [this] {
         if (levelSubscribers() == 0)

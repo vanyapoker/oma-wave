@@ -48,7 +48,7 @@ private:
     Visualizer *m_visualizer;
     Wave *m_wave;
     QString m_path;
-    QLocalServer m_server;
     QList<Client *> m_clients;
+    QLocalServer m_server;
     QTimer m_debounce, m_positionTimer;
 };

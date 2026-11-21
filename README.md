@@ -7,9 +7,13 @@ A YouTube Music player for [Omarchy](https://omarchy.org), in two parts:
 - **`omawave`**, a Qt 6 app that owns playback (mpv + yt-dlp) with Home, Search, Library, album, artist and playlist pages, a queue and synced lyrics. Closing the window releases its interface while playback and the queue continue; reopening starts on Home. MPRIS is built in, so media keys work.
 - **`vp.omawave`**, an Omarchy bar widget: a live audio visualizer (via `cava`), a scrolling "title · artist" label, play/pause, next and like buttons, and a mini-player popup with seek, transport, queue, lyrics and a Settings tab that changes the widget live.
 
+The popup seek bar holds the requested position while audio loads. If a seek does not complete, it returns to the reported position.
+
 The app uses Qt Quick's software renderer; it does not need GPU rendering for its interface.
 
 After one minute paused or idle, omawave stops mpv to release its memory. The queue and position remain available; the next playback or queue command restarts mpv and restores them, so it may take longer.
+
+On Home, My Wave shows mix cards with a preview of the first songs in each continuing mix. Play a card to start its previewed songs. Tune changes do not affect the current queue until you play a mix. Recommendations use local listening and likes, plus YouTube Music history and likes when signed in. Category rows with more items than fit have previous and next buttons and a horizontal scrollbar.
 
 For faster seeking, mpv stores network audio packets in a temporary disk cache. It also downloads the next YouTube Music track to a temporary cache when possible, up to 32 MiB. Downloads stop after two minutes, and playback falls back to streaming if they fail. Cache files are removed during normal shutdown; an interrupted process can leave files behind.
 
@@ -45,7 +49,7 @@ omawave status [--json] | play-pause | next | previous | show | quit
 | 1 / 2 / 3 | Home / Search / Library |
 | / or Ctrl+F | search |
 | U / L | queue / lyrics pane |
-| W | start My Wave (Mood / Activity / Character chips on Home) |
+| W | start My Wave (use Tune on Home to select Mood / Activity / Mix) |
 | F / D | like / dislike (dislike skips) |
 | N | now-playing page |
 | Esc | back |

@@ -17,6 +17,7 @@
         <file alias="Format.js">Format.js</file>
         <file alias="icons/account_circle.svg">icons/account_circle.svg</file>
         <file alias="icons/arrow_back.svg">icons/arrow_back.svg</file>
+        <file alias="icons/arrow_forward.svg">icons/arrow_forward.svg</file>
         <file alias="icons/close.svg">icons/close.svg</file>
         <file alias="icons/drag_indicator.svg">icons/drag_indicator.svg</file>
         <file alias="icons/graphic_eq.svg">icons/graphic_eq.svg</file>

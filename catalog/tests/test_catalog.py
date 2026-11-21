@@ -182,6 +182,75 @@ class CatalogTests(unittest.TestCase):
         result = worker.call('waveNext', {'character': 'discover', 'count': 3})['tracks']
         self.assertTrue(all(t['videoId'].startswith('n') for t in result))
 
+    def test_remote_seed_sources_fail_independently_and_retry(self):
+        worker = self.wave_worker()
+        raw = lambda video_id: {'videoId': video_id, 'title': video_id, 'artists': [{'name': video_id}]}
+        for broken, surviving in (('history', 'likes'), ('likes', 'history')):
+            worker._remote = None
+            calls = []
+
+            def fetch(name):
+                calls.append(name)
+                if name == broken and calls.count(name) == 1:
+                    raise RuntimeError('temporary failure')
+                return [raw(name)]
+
+            worker.client.get_history = lambda: fetch('history')
+            worker.client.get_liked_songs = lambda limit: {'tracks': fetch('likes')}
+            first = worker.remote_seeds(worker.client)
+            self.assertEqual([t['videoId'] for t in first[surviving]], [surviving])
+            self.assertEqual(first[broken], [])
+            second = worker.remote_seeds(worker.client)
+            self.assertEqual([t['videoId'] for t in second[broken]], [broken])
+            self.assertEqual(calls.count(broken), 2)
+            worker.remote_seeds(worker.client)
+            self.assertEqual(calls.count(broken), 2)
+
+    def test_wave_tuned_mix_uses_local_and_remote_taste(self):
+        worker = self.wave_worker()
+        worker.signed_in = True
+        worker.taste.log_play({'videoId': 'local', 'title': 'Local', 'artists': ['Local']},
+                              200000, 200000, 'other', False)
+        raw = lambda video_id, artist: {'videoId': video_id, 'title': video_id, 'artists': [{'name': artist}]}
+        worker.client.get_history = lambda: [raw('history', 'History')]
+        worker.client.get_liked_songs = lambda limit: {'tracks': [raw('liked', 'Liked')]}
+        seeds = []
+
+        def watch(videoId=None, playlistId=None, **kwargs):
+            if videoId:
+                seeds.append(videoId)
+                return {'tracks': [raw('radio-' + videoId + str(i), 'Radio' + videoId + str(i))
+                                   for i in range(5)]}
+            return {'tracks': [raw('mood' + str(i), 'Generic' + str(i)) for i in range(30)]}
+
+        worker.client.get_watch_playlist = watch
+        result = worker.call('waveNext', {'mood': 'calm', 'count': 5})['tracks']
+        self.assertIn('local', seeds)
+        self.assertTrue({'liked', 'history'} & set(seeds))
+        self.assertTrue(all(not t['videoId'].startswith('mood') for t in result))
+
+    def test_wave_remote_affinity_and_popular_seeding(self):
+        worker = self.wave_worker()
+        worker.signed_in = True
+        worker.random.uniform = lambda a, b: 0
+        raw = lambda video_id, artist: {'videoId': video_id, 'title': video_id, 'artists': [{'name': artist}]}
+        worker.client.get_history = lambda: [raw('history', 'History')]
+        worker.client.get_liked_songs = lambda limit: {'tracks': [raw('liked', 'Liked')]}
+        seeds = []
+
+        def watch(videoId=None, playlistId=None, **kwargs):
+            if videoId:
+                seeds.append(videoId)
+            return {'tracks': [raw('related-like', 'Liked'), raw('related-history', 'History'),
+                               raw('unrelated', 'Unrelated')]}
+
+        worker.client.get_watch_playlist = watch
+        result = worker.call('waveNext', {'character': 'popular', 'count': 3})['tracks']
+        self.assertTrue(seeds)
+        ids = [t['videoId'] for t in result]
+        self.assertLess(ids.index('related-like'), ids.index('unrelated'))
+        self.assertLess(ids.index('related-history'), ids.index('unrelated'))
+
     def test_wave_bad_input(self):
         with self.assertRaises(catalog.WorkerError) as exc:
             self.wave_worker().call('waveNext', {'mood': 'bogus'})

@@ -31,6 +31,63 @@ class OmawaveTests : public QObject {
         file.write(contents);
     }
 
+    void previewWorker(const QString &dir, const QString &mode) {
+        for (int i = 0; i < 30; ++i)
+            QVERIFY(QFile::copy(m_media.filePath("a.ogg"), dir + QString("/%1.ogg").arg(i)));
+        qputenv("OMAWAVE_PREVIEW_DIR", dir.toUtf8());
+        qputenv("OMAWAVE_PREVIEW_MODE", mode.toUtf8());
+        write(dir + "/worker.py",
+              "import sys, json, os, time\n"
+              "d=os.environ['OMAWAVE_PREVIEW_DIR']; mode=os.environ['OMAWAVE_PREVIEW_MODE']; n=0\n"
+              "print(json.dumps({'id':0,'result':{'ready':True,'signedIn':False}}),flush=True)\n"
+              "for line in sys.stdin:\n"
+              " r=json.loads(line); result={}\n"
+              " if r['method']=='waveNext':\n"
+              "  n+=1; p=r['params']; open(d+'/requests','a').write(json.dumps(p)+'\\n')\n"
+              "  if mode=='hold' and n==1:\n"
+              "   while not os.path.exists(d+'/release'): time.sleep(.01)\n"
+              "  if mode=='error' and n==1:\n"
+              "   print(json.dumps({'id':r['id'],'error':{'code':'failed','message':'Preview failed'}}),flush=True); continue\n"
+              "  count=2 if mode=='error' else 6\n"
+              "  result={'tracks':[{'videoId':str(n)+'-'+str(i),'title':p['mood']+' '+str(i),'url':d+'/'+str(((n-1)*6+i)%30)+'.ogg'} for i in range(count)]}\n"
+              " print(json.dumps({'id':r['id'],'result':result}),flush=True)\n");
+    }
+
+    static QList<QJsonObject> previewRequests(const QString &dir) {
+        QFile file(dir + "/requests");
+        QList<QJsonObject> requests;
+        if (file.open(QIODevice::ReadOnly))
+            while (!file.atEnd()) requests << QJsonDocument::fromJson(file.readLine()).object();
+        return requests;
+    }
+
+    static int previewRequestCount(const QString &dir, const QString &mood, const QString &character) {
+        int count = 0;
+        for (const auto &request : previewRequests(dir))
+            if (request.value("mood").toString() == mood &&
+                request.value("character").toString() == character &&
+                request.value("exclude").toArray().isEmpty())
+                ++count;
+        return count;
+    }
+
+    static int topUpRequestCount(const QString &dir, const QString &mood, const QString &character) {
+        int count = 0;
+        for (const auto &request : previewRequests(dir))
+            if (request.value("mood").toString() == mood &&
+                request.value("character").toString() == character &&
+                !request.value("exclude").toArray().isEmpty())
+                ++count;
+        return count;
+    }
+
+    static QVariantMap mixCard(const Wave &wave, const QString &character) {
+        for (const auto &card : wave.mixCards())
+            if (card.toMap().value("character").toString() == character)
+                return card.toMap();
+        return {};
+    }
+
 private slots:
     void initTestCase() {
         // Keep sockets and config away from a running omawave.
@@ -261,6 +318,18 @@ private slots:
                         return true;
                 return false;
             }(), 5000);
+
+        player.togglePause();
+        QTRY_VERIFY(!player.playing());
+        received.clear();
+        client.write("{\"v\":1,\"cmd\":\"seek\",\"positionMs\":1200}\n");
+        QTRY_VERIFY_WITH_TIMEOUT(
+            [&] {
+                for (const auto &m : received)
+                    if (m.value("type").toString() == "position" && m.value("positionMs").toInt() >= 1000)
+                        return true;
+                return false;
+            }(), 5000);
     }
 
     void catalogWorkerStops() {
@@ -321,6 +390,126 @@ private slots:
         QTRY_COMPARE(player.queueCount(), 9);
         player.playTracks(m_tracks, 0, false);
         QTRY_VERIFY(!wave.active());
+    }
+
+    void wavePreviewPlaysExactBatch() {
+        QTemporaryDir dir;
+        previewWorker(dir.path(), "normal");
+        Catalog catalog(dir.filePath("worker.py"), dir.path());
+        Settings settings(dir.path());
+        Player player(&catalog, &settings, {}, {"--ao=null"});
+        Wave wave(&catalog, &player, &settings);
+        wave.preparePreview();
+        QTRY_COMPARE(wave.previewTracks().size(), 3);
+        QVERIFY(!wave.active());
+        QCOMPARE(player.queueCount(), 0);
+        const QVariantList preview = wave.previewTracks();
+        wave.start();
+        QTRY_COMPARE(player.queueCount(), 6);
+        for (int i = 0; i < 3; ++i)
+            QCOMPARE(player.queue()->row(i).value("videoId"), preview[i].toMap().value("videoId"));
+        QCOMPARE(previewRequestCount(dir.path(), wave.mood(), wave.character()), 1);
+    }
+
+    void waveCardSelectionPlaysCachedPreview() {
+        QTemporaryDir dir;
+        previewWorker(dir.path(), "normal");
+        Catalog catalog(dir.filePath("worker.py"), dir.path());
+        Settings settings(dir.path());
+        Player player(&catalog, &settings, {}, {"--ao=null"});
+        Wave wave(&catalog, &player, &settings);
+        wave.prepareMixCards();
+        QTRY_COMPARE(mixCard(wave, "favourite").value("tracks").toList().size(), 3);
+        QTRY_COMPARE(mixCard(wave, "discover").value("tracks").toList().size(), 3);
+        QTRY_COMPARE(mixCard(wave, "popular").value("tracks").toList().size(), 3);
+        const QVariantList favourite = mixCard(wave, "favourite").value("tracks").toList();
+        const QVariantList discover = mixCard(wave, "discover").value("tracks").toList();
+
+        wave.playMix("discover");
+        QTRY_COMPARE(player.queueCount(), 6);
+        for (int i = 0; i < 3; ++i)
+            QCOMPARE(player.queue()->row(i).value("videoId"), discover[i].toMap().value("videoId"));
+        QCOMPARE(previewRequestCount(dir.path(), wave.mood(), "discover"), 1);
+        QCOMPARE(mixCard(wave, "favourite").value("tracks").toList(), favourite);
+
+        wave.playMix("favourite");
+        QTRY_COMPARE(player.queue()->row(0).value("videoId"), favourite[0].toMap().value("videoId"));
+        for (int i = 0; i < 3; ++i)
+            QTRY_COMPARE(player.queue()->row(i).value("videoId"), favourite[i].toMap().value("videoId"));
+        QCOMPARE(previewRequestCount(dir.path(), wave.mood(), "favourite"), 1);
+    }
+
+    void waveTuningWaitsForPlay() {
+        QTemporaryDir dir;
+        previewWorker(dir.path(), "normal");
+        Catalog catalog(dir.filePath("worker.py"), dir.path());
+        Settings settings(dir.path());
+        Player player(&catalog, &settings, {}, {"--ao=null"});
+        Wave wave(&catalog, &player, &settings);
+        wave.start();
+        QTRY_COMPARE(player.queueCount(), 6);
+        wave.setMood("calm");
+        wave.preparePreview();
+        QTRY_COMPARE(wave.previewTracks().size(), 3);
+        QCOMPARE(player.queue()->row(0).value("videoId").toString(), QString("1-0"));
+        QCOMPARE(player.queue()->row(5).value("videoId").toString(), QString("1-5"));
+        player.jump(4);
+        QTRY_COMPARE(topUpRequestCount(dir.path(), "any", "favourite"), 1);
+        const QString first = wave.previewTracks()[0].toMap().value("videoId").toString();
+        wave.start();
+        QTRY_COMPARE(player.queue()->row(0).value("videoId").toString(), first);
+        player.jump(4);
+        QTRY_COMPARE(topUpRequestCount(dir.path(), "calm", "favourite"), 1);
+    }
+
+    void wavePreviewDiscardsStaleReplies() {
+        QTemporaryDir dir;
+        previewWorker(dir.path(), "hold");
+        Catalog catalog(dir.filePath("worker.py"), dir.path());
+        Settings settings(dir.path());
+        Player player(&catalog, &settings, {}, {"--ao=null"});
+        Wave wave(&catalog, &player, &settings);
+        wave.start();
+        QTRY_COMPARE(previewRequestCount(dir.path(), "any", "favourite"), 1);
+        wave.setMood("happy");
+        wave.setMood("calm");
+        wave.start();
+        wave.preparePreview();
+        wave.stop();
+        write(dir.filePath("release"), "go");
+        QTRY_COMPARE(wave.previewTracks().size(), 3);
+        QCOMPARE(wave.previewTracks()[0].toMap().value("title").toString(), QString("calm 0"));
+        QCOMPARE(previewRequestCount(dir.path(), "happy", "favourite"), 0);
+        QCOMPARE(previewRequestCount(dir.path(), "calm", "favourite"), 1);
+        for (const auto &track : wave.previewTracks())
+            QVERIFY(track.toMap().value("title").toString().startsWith("calm "));
+        QCOMPARE(previewRequestCount(dir.path(), "any", "favourite"), 1);
+        QVERIFY(!wave.active());
+        QCOMPARE(player.queueCount(), 0);
+    }
+
+    void wavePreviewRetriesFailures() {
+        QTemporaryDir dir;
+        previewWorker(dir.path(), "error");
+        Catalog catalog(dir.filePath("worker.py"), dir.path());
+        Settings settings(dir.path());
+        Player player(&catalog, &settings, {}, {"--ao=null"});
+        Wave wave(&catalog, &player, &settings);
+        wave.preparePreview();
+        QTRY_COMPARE(wave.previewError(), QString("Preview failed"));
+        QVERIFY(!wave.active());
+        QCOMPARE(player.queueCount(), 0);
+        wave.preparePreview();
+        QTest::qWait(300);
+        QCOMPARE(previewRequestCount(dir.path(), wave.mood(), wave.character()), 1);
+        wave.retryPreview();
+        QTRY_COMPARE(wave.previewTracks().size(), 2);
+        QCOMPARE(previewRequestCount(dir.path(), wave.mood(), wave.character()), 2);
+        const auto preview = wave.previewTracks();
+        wave.start();
+        QTRY_VERIFY(player.queueCount() >= 2);
+        QCOMPARE(player.queue()->row(0).value("videoId"), preview[0].toMap().value("videoId"));
+        QCOMPARE(player.queue()->row(1).value("videoId"), preview[1].toMap().value("videoId"));
     }
 };
 

@@ -372,9 +372,11 @@ class Worker:
                 client = ytmusicapi.YTMusic(auth=str(self.auth))
                 client.get_library_playlists(limit=1)
                 self.client = client
+                self._remote = None
                 self.signed_in = True
             except Exception as exc:
                 self.clear_auth()
+                self._remote = None
                 self.client = ytmusicapi.YTMusic()
                 self.signed_in = False
                 raise WorkerError('sign_in_failed', str(exc)) from exc
@@ -395,13 +397,20 @@ class Worker:
         cached = self._remote
         if cached and time.time() - cached[0] < 600:
             return cached[1]
-        tracks = []
-        try:
-            tracks = mapped(client.get_history()[:20], track) + mapped(client.get_liked_songs(limit=50).get('tracks'), track)
-        except Exception as exc:
-            print('Remote seeds failed: ' + str(exc), file=sys.stderr)
-        self._remote = (time.time(), tracks)
-        return tracks
+        sources, failed = {}, False
+        for name, fetch in (
+                ('history', lambda: client.get_history()[:20]),
+                ('likes', lambda: client.get_liked_songs(limit=50).get('tracks'))):
+            try:
+                sources[name] = mapped(fetch(), track)
+            except Exception as exc:
+                print('Remote %s failed: %s' % (name, exc), file=sys.stderr)
+                sources[name] = []
+                failed = True
+        # A temporary failure must not hide the missing source for ten minutes.
+        if not failed:
+            self._remote = (time.time(), sources)
+        return sources
 
     def wave_next(self, client, signed_in, params):
         mood, activity, character = (text(params.get(k) or d) for k, d in (('mood', 'any'), ('activity', 'any'), ('character', 'favourite')))
@@ -432,20 +441,31 @@ class Worker:
                 print('Wave source failed: ' + str(exc), file=sys.stderr)
                 return None
 
-        pool = list({t['videoId']: t for t in profile['favourites'] + (self.remote_seeds(client) if signed_in else [])}.values())
+        remote = self.remote_seeds(client) if signed_in else {'history': [], 'likes': []}
+        remote_artists = {}
+        for name, amount in (('history', 1), ('likes', 3)):
+            for trk in remote[name]:
+                for artist in set(a.lower() for a in trk['artists']):
+                    remote_artists[artist] = remote_artists.get(artist, 0) + amount
+        remote_known = {t['videoId'] for t in remote['history'] + remote['likes']}
         seeds = []
         if profile['session_seed']:
             seeds.append(profile['session_seed']['videoId'])
-        picks = {'favourite': 2, 'discover': 1, 'popular': 0}[character]
-        for trk in rng.sample(pool, min(picks, len(pool))):
-            if trk['videoId'] not in seeds:
-                seeds.append(trk['videoId'])
+        # Give both local and remote taste a chance to seed radio rather than
+        # allowing a large remote library to crowd out local listening.
+        pools = (profile['favourites'], remote['likes'] + remote['history'])
+        for pool in pools:
+            available = {t['videoId']: t for t in pool
+                         if t['videoId'] not in seeds and t['videoId'] not in profile['disliked']
+                         and t['videoId'] not in profile['skipped2']}
+            if available:
+                seeds.append(rng.choice(list(available)))
         tuned = mood != 'any' or activity != 'any'
         for seed in seeds:
             tracks = attempt(lambda: mapped(client.get_watch_playlist(videoId=seed, radio=True, limit=30).get('tracks'), track))
             for trk in tracks or []:
                 if trk['videoId'] != seed:
-                    add(trk, 0.5 if tuned else 1.0, 'radio')
+                    add(trk, 1.0, 'radio')
         if tuned or character == 'popular' or not seeds:
             titles = []
             for title in (MOODS[mood], ACTIVITIES[activity]):
@@ -462,9 +482,9 @@ class Worker:
                     chosen = rng.choice(playlists)
                     return mapped(client.get_watch_playlist(playlistId=chosen['playlistId'], limit=50).get('tracks'), track)
                 for trk in attempt(mood_tracks) or []:
-                    add(trk, 1.0, 'mood')
+                    add(trk, 0.6 if seeds else 1.0, 'mood')
         if character == 'favourite':
-            for trk in profile['favourites']:
+            for trk in profile['favourites'] + remote['likes']:
                 add(trk, 0.7, 'favourite')
         if not candidates and last_error is not None:
             raise last_error
@@ -476,9 +496,10 @@ class Worker:
                 continue
             if any(profile['artist_dislikes'].get(a, 0) >= 2 for a in artists):
                 continue
-            affinity = max(-5, min(5, sum(profile['artist_score'].get(a, 0) for a in artists))) / 5
-            score = (weight + AFFINITY[character] * affinity + KNOWN_BONUS[character] * (video_id in profile['known'])
-                     + (0.5 if character == 'popular' and source == 'mood' else 0) + rng.uniform(0, 0.3))
+            affinity = max(-5, min(5, sum(profile['artist_score'].get(a, 0) + remote_artists.get(a, 0)
+                                             for a in artists))) / 5
+            score = (weight + AFFINITY[character] * affinity + KNOWN_BONUS[character] * (video_id in profile['known'] or video_id in remote_known)
+                     + (0.2 if character == 'popular' and source == 'mood' else 0) + rng.uniform(0, 0.3))
             scored.append((score, trk))
         scored.sort(key=lambda x: -x[0])
         result, per_artist = [], {}
@@ -513,6 +534,7 @@ class Worker:
                 self.clear_auth()
                 self.client = ytmusicapi.YTMusic()
                 self.signed_in = False
+                self._remote = None
             return {'signedIn': False}
         if method == 'lyrics':
             return fetch_lyrics(params)

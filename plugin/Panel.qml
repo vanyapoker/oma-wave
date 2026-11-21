@@ -236,7 +236,7 @@ Panel {
             value: root.backend ? root.backend.positionMs : 0
             integer: true
             enabled: !!root.track
-            onReleased: function(value) { if (root.backend) root.backend.send("seek", {positionMs: Math.round(value)}) }
+            onReleased: function(value) { if (root.backend) root.backend.seek(value) }
           }
           Item {
             width: parent.width; height: timeLeft.implicitHeight
@@ -261,11 +261,11 @@ Panel {
             spacing: Style.space(6)
             LayoutMirroring.enabled: false
             LayoutMirroring.childrenInherit: true
-            Button { iconText: root.playerState && root.playerState.rating === "dislike" ? "󰔑" : "󰔒"; foreground: root.playerState && root.playerState.rating === "dislike" ? Commons.Color.accent : (root.bar ? root.bar.foreground : Commons.Color.foreground); tooltipText: strings.t("dislike"); enabled: !!root.track; opacity: enabled ? 1 : 0.4; onClicked: root.dislike() }
-            Button { iconText: "󰒮"; foreground: root.bar ? root.bar.foreground : Commons.Color.foreground; enabled: !!root.playerState && root.playerState.canPrevious; opacity: enabled ? 1 : 0.4; onClicked: root.backend.send("previous") }
-            Button { iconText: root.playerState && root.playerState.playing ? "󰏤" : "󰐊"; foreground: root.bar ? root.bar.foreground : Commons.Color.foreground; onClicked: root.backend.send("playPause") }
-            Button { iconText: "󰒭"; foreground: root.bar ? root.bar.foreground : Commons.Color.foreground; enabled: !!root.playerState && root.playerState.canNext; opacity: enabled ? 1 : 0.4; onClicked: root.backend.send("next") }
-            Button { iconText: root.playerState && root.playerState.rating === "like" ? "󰔓" : "󰔔"; foreground: root.playerState && root.playerState.rating === "like" ? Commons.Color.accent : (root.bar ? root.bar.foreground : Commons.Color.foreground); tooltipText: strings.t("like"); enabled: !!root.track; opacity: enabled ? 1 : 0.4; onClicked: root.toggleLike() }
+            TransportButton { iconText: root.playerState && root.playerState.rating === "dislike" ? "󰔑" : "󰔒"; foreground: root.playerState && root.playerState.rating === "dislike" ? Commons.Color.accent : (root.bar ? root.bar.foreground : Commons.Color.foreground); enabled: !!root.track; opacity: enabled ? 1 : 0.4; onClicked: root.dislike() }
+            TransportButton { iconText: "󰒮"; foreground: root.bar ? root.bar.foreground : Commons.Color.foreground; enabled: !!root.playerState && root.playerState.canPrevious; opacity: enabled ? 1 : 0.4; onClicked: root.backend.send("previous") }
+            TransportButton { iconText: root.playerState && root.playerState.playing ? "󰏤" : "󰐊"; foreground: root.bar ? root.bar.foreground : Commons.Color.foreground; onClicked: root.backend.send("playPause") }
+            TransportButton { iconText: "󰒭"; foreground: root.bar ? root.bar.foreground : Commons.Color.foreground; enabled: !!root.playerState && root.playerState.canNext; opacity: enabled ? 1 : 0.4; onClicked: root.backend.send("next") }
+            TransportButton { iconText: root.playerState && root.playerState.rating === "like" ? "󰔓" : "󰔔"; foreground: root.playerState && root.playerState.rating === "like" ? Commons.Color.accent : (root.bar ? root.bar.foreground : Commons.Color.foreground); enabled: !!root.track; opacity: enabled ? 1 : 0.4; onClicked: root.toggleLike() }
           }
           Row {
             anchors.horizontalCenter: parent.horizontalCenter
